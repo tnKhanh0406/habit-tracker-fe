@@ -1,0 +1,83 @@
+{
+  "habits": 
+  [
+    {
+      "id": 1,
+      "name": "Exercise",
+      "icon": "muscle",
+      "color": "#FF5733",
+      "status": "active",
+      "targetUnit": "minutes",
+      "targetValue": 30,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 5
+    },
+    {
+      "id": 2,
+      "name": "Drink Water",
+      "icon": "water",
+      "color": "#3498DB",
+      "status": "active",
+      "targetUnit": "glasses",
+      "targetValue": 8,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 3
+    },
+    {
+      "id": 3,
+      "name": "Read Books",
+      "icon": "book",
+      "color": "#9B59B6",
+      "status": "active",
+      "targetUnit": "minutes",
+      "targetValue": 20,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 7
+    },
+    {
+      "id": 4,
+      "name": "Meditation",
+      "icon": "meditation",
+      "color": "#2ECC71",
+      "status": "active",
+      "targetUnit": "minutes",
+      "targetValue": 10,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 4
+    },
+    {
+      "id": 5,
+      "name": "Learn English",
+      "icon": "language",
+      "color": "#F1C40F",
+      "status": "active",
+      "targetUnit": "minutes",
+      "targetValue": 30,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 6
+    },
+    {
+      "id": 6,
+      "name": "Sleep Early",
+      "icon": "moon",
+      "color": "#34495E",
+      "status": "active",
+      "targetUnit": "days",
+      "targetValue": 1,
+      "progress": 0,
+      "completed": false,
+      "isScheduledToday": true,
+      "currentStreak": 2
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+import api from "./axios";
+
+export const getRewards = () => {
+  return api.get('/rewards');
+}
+
+export const createRewardWithName = (name) => {
+  return api.post('/rewards/name', {
+    name: name
+  });
+}
+
+export const updateReward = (rewardId, request) => {
+  return api.put(`/rewards/${rewardId}`, request);
+}
+
+export const deleteReward = (rewardId) => {
+  return api.delete(`/rewards/${rewardId}`);
+}

@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    color: #1d211c;
+    background:
+      linear-gradient(90deg, rgba(29, 78, 74, 0.035) 1px, transparent 1px),
+      linear-gradient(180deg, rgba(29, 78, 74, 0.03) 1px, transparent 1px),
+      #f6f3ee;
+    background-size: 32px 32px;
+    font-family:
+      Aptos, "Aptos Display", "Segoe UI", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-variant-numeric: tabular-nums;
+    text-rendering: geometricPrecision;
+  }
+
+  button,
+  input {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  #app {
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    outline: 2px solid #0f766e;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    color: #052f2b;
+    background: #99f6e4;
+  }
+}
