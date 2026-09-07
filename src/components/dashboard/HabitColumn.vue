@@ -106,12 +106,14 @@ const handleSelectReminder = (habit) => {
 }
 
 const filteredHabits = computed(() => {
-  return props.habits.filter((habit) => {
-    if (habit.completed && !showCompleted.value) return false
-    if (activeFilter.value === 'Due') return habit.isScheduledToday
-    if (activeFilter.value === 'Not Due') return !habit.isScheduledToday
-    return true
-  })
+  return props.habits
+    .filter((habit) => {
+      if (habit.completed && !showCompleted.value) return false
+      if (activeFilter.value === 'Due') return habit.isScheduledToday
+      if (activeFilter.value === 'Not Due') return !habit.isScheduledToday
+      return true
+    })
+    .sort((firstHabit, secondHabit) => Number(isDueHabit(secondHabit)) - Number(isDueHabit(firstHabit)))
 })
 
 const completedHabitsCount = computed(() => {
@@ -129,6 +131,50 @@ const calculatePercentage = (progress, targetValue) => {
   if (!targetValue || targetValue <= 0) return 0
   const pct = Math.round((Number(progress || 0) / Number(targetValue)) * 100)
   return Math.min(pct, 100)
+}
+
+const getTrackingType = (habit) => {
+  if (habit.trackingType === 'CHECK' || habit.trackingType === 'QUANTITY') {
+    return habit.trackingType
+  }
+
+  return habit.targetValue && habit.targetUnit ? 'QUANTITY' : 'CHECK'
+}
+
+const isQuantityHabit = (habit) => {
+  return getTrackingType(habit) === 'QUANTITY'
+}
+
+const isDueHabit = (habit) => {
+  return Boolean(habit.isScheduledToday)
+}
+
+const getSoftColor = (color, alpha = 0.12) => {
+  const fallback = '15, 118, 110'
+  if (!color || !color.startsWith('#')) return `rgba(${fallback}, ${alpha})`
+
+  const hex = color.replace('#', '')
+  const normalizedHex = hex.length === 3
+    ? hex.split('').map((char) => char + char).join('')
+    : hex
+
+  if (normalizedHex.length !== 6) return `rgba(${fallback}, ${alpha})`
+
+  const red = parseInt(normalizedHex.slice(0, 2), 16)
+  const green = parseInt(normalizedHex.slice(2, 4), 16)
+  const blue = parseInt(normalizedHex.slice(4, 6), 16)
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+const getHabitCardStyle = (habit) => {
+  const color = habit.color || '#0f766e'
+  const isMuted = !isDueHabit(habit) && !habit.completed
+
+  return {
+    backgroundColor: getSoftColor(color, habit.completed ? 0.06 : isMuted ? 0.055 : 0.13),
+    borderColor: getSoftColor(color, habit.completed ? 0.12 : isMuted ? 0.12 : 0.26),
+  }
 }
 
 onMounted(() => {
@@ -183,132 +229,143 @@ onUnmounted(() => {
       </button>
     </div>
 
-    <div class="min-h-0 flex-1 divide-y divide-stone-200 overflow-y-auto">
+    <div class="min-h-0 flex-1 space-y-2 overflow-y-auto">
       <article
         v-for="habit in filteredHabits"
         :key="habit.id"
-        :class="['relative py-4 pr-9 transition hover:bg-white/70', habit.completed && 'opacity-65']"
+        :class="[
+          'relative rounded-md border px-3 py-3 transition hover:shadow-[0_10px_24px_rgba(41,37,36,0.08)]',
+          !isDueHabit(habit) && !habit.completed && 'opacity-55 hover:opacity-75',
+          habit.completed && 'opacity-65',
+        ]"
+        :style="getHabitCardStyle(habit)"
       >
-        <div class="absolute right-0 top-3" data-habit-menu>
-          <button
-            type="button"
-            class="grid size-8 place-items-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-900 active:translate-y-px"
-            aria-label="Habit actions"
-            @click.stop="toggleHabitMenu(habit.id)"
-          >
-            <MoreVertical :size="17" />
-          </button>
-
+        <div class="grid grid-cols-[44px_minmax(0,1fr)_76px_32px] items-start gap-3">
           <div
-            v-if="activeMenuHabitId === habit.id"
-            class="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-[0_16px_40px_rgba(41,37,36,0.14)]"
+            class="grid size-11 shrink-0 place-items-center rounded-md text-white shadow-[0_12px_24px_rgba(41,37,36,0.12)]"
+            :style="{ backgroundColor: habit.color || '#0f766e' }"
           >
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-              @click="handleSelectInformation(habit)"
-            >
-              <Info :size="16" class="text-teal-800" />
-              Information
-            </button>
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-              @click="handleSelectSchedule(habit)"
-            >
-              <Clock :size="16" class="text-teal-800" />
-              Schedule
-            </button>
-            <button
-              type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
-              @click="handleSelectReminder(habit)"
-            >
-              <Bell :size="16" class="text-teal-800" />
-              Reminder
-            </button>
+            <component :is="getHabitIcon(habit.icon)" class="size-5" />
           </div>
-        </div>
 
-        <div class="flex items-start justify-between gap-3">
-          <div class="flex min-w-0 flex-1 items-start gap-3">
-            <div
-              class="grid size-11 shrink-0 place-items-center rounded-md text-white shadow-[0_12px_24px_rgba(41,37,36,0.12)]"
-              :style="{ backgroundColor: habit.color || '#0f766e' }"
+          <div class="min-w-0">
+            <h4
+              :class="[
+                'm-0 break-words text-sm font-semibold leading-snug text-stone-950',
+                habit.completed && 'text-stone-400 line-through',
+                !isDueHabit(habit) && !habit.completed && 'text-stone-600',
+              ]"
             >
-              <component :is="getHabitIcon(habit.icon)" class="size-5" />
-            </div>
+              {{ habit.name }}
+            </h4>
 
-            <div class="min-w-0 flex-1">
-              <div class="flex min-w-0 flex-wrap items-center gap-2">
-                <h4
-                  :class="[
-                    'm-0 truncate text-sm font-semibold leading-snug text-stone-950',
-                    habit.completed && 'text-stone-400 line-through',
-                  ]"
-                >
-                  {{ habit.name }}
-                </h4>
+            <span
+              v-if="isDueHabit(habit)"
+              class="mt-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded-sm border border-teal-800/15 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800"
+            >
+              <Calendar class="size-3.5" />
+              Due today
+            </span>
 
-                <span
-                  v-if="habit.isScheduledToday"
-                  class="inline-flex items-center gap-1 rounded-sm border border-teal-800/15 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800"
-                >
-                  <Calendar class="size-3.5" />
-                  Due today
+            <p v-if="!isQuantityHabit(habit)" class="m-0 mt-2 text-xs font-medium text-stone-600">
+              {{ habit.completed ? 'Completed' : 'Completion habit' }}
+            </p>
+
+            <div v-if="isQuantityHabit(habit)" class="mt-3 space-y-1.5">
+              <div class="flex items-center justify-between gap-3 text-xs font-medium text-stone-600">
+                <span>
+                  <strong class="text-base font-semibold tracking-[-0.01em] text-teal-900">
+                    {{ habit.progress || 0 }}
+                  </strong>
+                  / {{ habit.targetValue || 0 }} {{ habit.targetUnit || '' }}
                 </span>
+                <span>{{ calculatePercentage(habit.progress, habit.targetValue) }}%</span>
               </div>
 
-              <div v-if="habit.targetValue && habit.targetValue > 0" class="mt-3 space-y-1.5">
-                <div class="flex items-center justify-between gap-3 text-xs font-medium text-stone-600">
-                  <span>
-                    <strong class="text-base font-semibold tracking-[-0.01em] text-teal-900">
-                      {{ habit.progress || 0 }}
-                    </strong>
-                    / {{ habit.targetValue }} {{ habit.targetUnit || '' }}
-                  </span>
-                  <span>{{ calculatePercentage(habit.progress, habit.targetValue) }}%</span>
-                </div>
-
-                <div class="h-1.5 w-full overflow-hidden rounded-sm bg-stone-200">
-                  <div
-                    class="h-full rounded-sm bg-teal-700 transition-all duration-300"
-                    :style="{ width: `${calculatePercentage(habit.progress, habit.targetValue)}%` }"
-                  ></div>
-                </div>
+              <div class="h-1.5 w-full overflow-hidden rounded-sm bg-stone-200">
+                <div
+                  class="h-full rounded-sm bg-teal-700 transition-all duration-300"
+                  :style="{ width: `${calculatePercentage(habit.progress, habit.targetValue)}%` }"
+                ></div>
               </div>
             </div>
           </div>
 
-          <div class="flex shrink-0 items-center gap-2">
+          <div class="flex min-h-16 flex-col items-end justify-between gap-2">
             <div
               v-if="habit.currentStreak !== undefined && habit.currentStreak !== null"
-              class="inline-flex items-center gap-1 text-xs font-semibold text-red-700"
+              class="inline-flex min-h-5 items-center justify-center gap-1 text-xs font-semibold text-red-700"
             >
               <Flame class="size-3.5 fill-red-600 text-red-600" />
               <span>{{ habit.currentStreak }}</span>
             </div>
+            <span v-else class="min-h-5"></span>
 
+            <div class="grid grid-cols-[2rem_2.25rem] items-center justify-end gap-2">
+              <button
+                v-if="isQuantityHabit(habit)"
+                type="button"
+                class="grid size-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-700 hover:text-teal-800 active:translate-y-px"
+                aria-label="Update habit progress"
+                @click="emit('open-checkin', habit)"
+              >
+                <Plus class="size-4" />
+              </button>
+              <span v-else class="size-8"></span>
+
+              <button
+                type="button"
+                :class="[
+                  'grid size-9 place-items-center rounded-md text-white transition active:translate-y-px',
+                  habit.completed ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-teal-800 hover:bg-teal-700',
+                ]"
+                :aria-label="habit.completed ? 'Mark habit incomplete' : 'Mark habit complete'"
+                @click="toggleHabitCompletion(habit)"
+              >
+                <Check class="size-5 stroke-[2.6]" />
+              </button>
+            </div>
+          </div>
+
+          <div class="relative" data-habit-menu>
             <button
               type="button"
-              class="grid size-8 place-items-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-teal-700 hover:text-teal-800 active:translate-y-px"
-              aria-label="Update habit progress"
-              @click="emit('open-checkin', habit)"
+              class="grid size-8 place-items-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-900 active:translate-y-px"
+              aria-label="Habit actions"
+              @click.stop="toggleHabitMenu(habit.id)"
             >
-              <Plus class="size-4" />
+              <MoreVertical :size="17" />
             </button>
 
-            <button
-              type="button"
-              :class="[
-                'grid size-9 place-items-center rounded-md text-white transition active:translate-y-px',
-                habit.completed ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-teal-800 hover:bg-teal-700',
-              ]"
-              :aria-label="habit.completed ? 'Mark habit incomplete' : 'Mark habit complete'"
-              @click="toggleHabitCompletion(habit)"
+            <div
+              v-if="activeMenuHabitId === habit.id"
+              class="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-[0_16px_40px_rgba(41,37,36,0.14)]"
             >
-              <Check class="size-5 stroke-[2.6]" />
-            </button>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                @click="handleSelectInformation(habit)"
+              >
+                <Info :size="16" class="text-teal-800" />
+                Information
+              </button>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                @click="handleSelectSchedule(habit)"
+              >
+                <Clock :size="16" class="text-teal-800" />
+                Schedule
+              </button>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+                @click="handleSelectReminder(habit)"
+              >
+                <Bell :size="16" class="text-teal-800" />
+                Reminder
+              </button>
+            </div>
           </div>
         </div>
       </article>

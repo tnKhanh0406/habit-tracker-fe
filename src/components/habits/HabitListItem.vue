@@ -17,6 +17,15 @@ const emit = defineEmits([
   'toggle-progress',
   'edit-information',
 ])
+
+const getTrackingType = (habit) => {
+  if (habit.trackingType === 'CHECK' || habit.trackingType === 'QUANTITY') return habit.trackingType
+  return habit.targetValue && habit.targetUnit ? 'QUANTITY' : 'CHECK'
+}
+
+const isQuantityHabit = (habit) => {
+  return getTrackingType(habit) === 'QUANTITY'
+}
 </script>
 
 <template>
@@ -30,8 +39,11 @@ const emit = defineEmits([
           {{ habit.icon }} - {{ habit.color }} - Streak: {{ habit.currentStreak }}
         </p>
         <h2 class="m-0 mt-1 text-lg font-semibold text-stone-950">{{ habit.name }}</h2>
-        <p class="m-0 mt-1 text-sm text-stone-600">
+        <p v-if="isQuantityHabit(habit)" class="m-0 mt-1 text-sm text-stone-600">
           Progress: {{ habit.progress }}/{{ habit.targetValue }} {{ habit.targetUnit }}
+        </p>
+        <p v-else class="m-0 mt-1 text-sm text-stone-600">
+          Completion habit
         </p>
         <p class="m-0 mt-1 text-sm text-stone-600">
           {{ habit.completed ? 'Completed' : 'Not completed yet.' }}
@@ -50,6 +62,7 @@ const emit = defineEmits([
           {{ habit.completed ? 'Done' : 'Open' }}
         </button>
         <button
+          v-if="isQuantityHabit(habit)"
           type="button"
           class="rounded-md border border-stone-300 px-3 py-2 font-semibold text-stone-700 transition hover:bg-stone-100 active:translate-y-px"
           @click="emit('toggle-progress', habit.id)"

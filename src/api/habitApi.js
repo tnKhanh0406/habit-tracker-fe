@@ -6,7 +6,10 @@ export const getHabits = () => {
 
 export const createHabitWithName = (name) => {
   return api.post('/habits', {
-    name: name
+    name: name,
+    trackingType: 'CHECK',
+    targetValue: null,
+    targetUnit: null
   });
 }
 

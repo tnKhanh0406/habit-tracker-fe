@@ -21,7 +21,7 @@ const autoMarkComplete = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
 
-const targetVal = computed(() => Number(props.habit.targetValue || 1))
+const targetVal = computed(() => Number(props.habit.targetValue ?? 0))
 const targetUnitStr = computed(() => props.habit.targetUnit || '')
 const currentProg = computed(() => Number(props.habit.progress || 0))
 

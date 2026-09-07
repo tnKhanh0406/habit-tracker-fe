@@ -8,6 +8,7 @@ import {
   HABIT_COLORS,
   HABIT_DIFFICULTIES,
   HABIT_ICONS,
+  HABIT_TRACKING_TYPES,
   LEGACY_HABIT_ICON_MAP,
 } from '@/constants/habitOptions'
 import FormActions from './form/FormActions.vue'
@@ -19,6 +20,7 @@ import HabitIconPicker from './form/HabitIconPicker.vue'
 import HabitNameField from './form/HabitNameField.vue'
 import HabitPreview from './form/HabitPreview.vue'
 import HabitTargetFields from './form/HabitTargetFields.vue'
+import HabitTrackingTypeSelect from './form/HabitTrackingTypeSelect.vue'
 
 const props = defineProps({
   habit: {
@@ -36,14 +38,17 @@ const form = reactive({
   icon: HABIT_ICONS[0].key,
   difficulty: 'EASY',
   categoryIds: [],
+  trackingType: 'CHECK',
   targetUnit: '',
-  targetValue: 1,
+  targetValue: null,
 })
 
 const categories = ref([])
 const loadingCategories = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+const lastQuantityTargetValue = ref(1)
+const lastQuantityTargetUnit = ref('')
 
 const selectedIcon = computed(() => {
   return HABIT_ICONS.find((icon) => icon.key === form.icon)?.component || Dumbbell
@@ -60,6 +65,11 @@ function normalizeIcon(icon) {
   return HABIT_ICONS.some((option) => option.key === normalizedIcon) ? normalizedIcon : HABIT_ICONS[0].key
 }
 
+function normalizeTrackingType(habit) {
+  if (habit.trackingType === 'CHECK' || habit.trackingType === 'QUANTITY') return habit.trackingType
+  return habit.targetValue && habit.targetUnit ? 'QUANTITY' : 'CHECK'
+}
+
 function fillForm(habit) {
   form.name = habit.name || ''
   form.description = habit.description || ''
@@ -67,11 +77,35 @@ function fillForm(habit) {
   form.icon = normalizeIcon(habit.icon)
   form.difficulty = HABIT_DIFFICULTIES.includes(habit.difficulty) ? habit.difficulty : 'EASY'
   form.categoryIds = getHabitCategoryIds(habit)
+  form.trackingType = normalizeTrackingType(habit)
   form.targetUnit = habit.targetUnit || ''
-  form.targetValue = Number(habit.targetValue || 1)
+  form.targetValue = habit.targetValue === null || habit.targetValue === undefined ? null : Number(habit.targetValue)
+
+  if (form.targetValue && form.targetValue > 0) {
+    lastQuantityTargetValue.value = form.targetValue
+  }
+  if (form.targetUnit) {
+    lastQuantityTargetUnit.value = form.targetUnit
+  }
+}
+
+function setTrackingType(type) {
+  if (form.trackingType === 'QUANTITY') {
+    if (Number(form.targetValue) > 0) lastQuantityTargetValue.value = Number(form.targetValue)
+    if (form.targetUnit.trim()) lastQuantityTargetUnit.value = form.targetUnit
+  }
+
+  form.trackingType = type
+
+  if (type === 'QUANTITY') {
+    form.targetValue = Number(lastQuantityTargetValue.value || form.targetValue || 1)
+    form.targetUnit = lastQuantityTargetUnit.value || form.targetUnit || ''
+  }
 }
 
 function buildPayload() {
+  const isQuantity = form.trackingType === 'QUANTITY'
+
   return {
     name: form.name.trim(),
     description: form.description.trim(),
@@ -79,15 +113,20 @@ function buildPayload() {
     icon: form.icon,
     difficulty: form.difficulty,
     categoryIds: form.categoryIds,
-    targetUnit: form.targetUnit.trim(),
-    targetValue: Number(form.targetValue),
+    trackingType: form.trackingType,
+    targetUnit: isQuantity ? form.targetUnit.trim() : null,
+    targetValue: isQuantity ? Number(form.targetValue) : null,
   }
 }
 
 function validateForm() {
   if (!form.name.trim()) return 'Name is required.'
-  if (!form.color || !form.icon || !form.difficulty || !form.targetUnit.trim()) {
+  if (!form.color || !form.icon || !form.difficulty || !form.trackingType) {
     return 'Please fill in all required fields.'
+  }
+  if (form.trackingType === 'QUANTITY') {
+    if (!Number(form.targetValue) || Number(form.targetValue) <= 0) return 'Target must be greater than 0.'
+    if (!form.targetUnit.trim()) return 'Unit is required for amount tracking.'
   }
   if (!form.categoryIds.length) return 'Please choose at least one category.'
   return ''
@@ -140,25 +179,35 @@ onMounted(fetchCategories)
 <template>
   <ModalShell
     title="Update habit information"
-    subtitle="Basic profile, target, categories, color and icon."
+    subtitle="Basic profile, tracking type, categories, color and icon."
     @close="emit('cancel')"
   >
     <form class="grid gap-5 px-5 py-5" @submit.prevent="submitForm">
       <div class="grid gap-4 md:grid-cols-2">
         <HabitNameField v-model="form.name" />
-        <HabitTargetFields v-model:target-value="form.targetValue" v-model:target-unit="form.targetUnit" />
+        <HabitDifficultySelect v-model="form.difficulty" :difficulties="HABIT_DIFFICULTIES" />
       </div>
 
       <HabitDescriptionField v-model="form.description" />
+      <HabitTrackingTypeSelect
+        :model-value="form.trackingType"
+        :options="HABIT_TRACKING_TYPES"
+        @update:model-value="setTrackingType"
+      />
+      <HabitTargetFields
+        v-if="form.trackingType === 'QUANTITY'"
+        v-model:target-value="form.targetValue"
+        v-model:target-unit="form.targetUnit"
+      />
       <HabitColorPicker v-model="form.color" :colors="HABIT_COLORS" />
       <HabitIconPicker v-model="form.icon" :icons="HABIT_ICONS" />
-      <HabitDifficultySelect v-model="form.difficulty" :difficulties="HABIT_DIFFICULTIES" />
       <HabitCategoryPicker v-model="form.categoryIds" :categories="categories" :loading="loadingCategories" />
 
       <HabitPreview
         :name="form.name"
         :color="form.color"
         :icon="selectedIcon"
+        :tracking-type="form.trackingType"
         :target-value="form.targetValue"
         :target-unit="form.targetUnit"
       />

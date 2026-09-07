@@ -51,6 +51,15 @@ const getHabitIcon = (iconKey) => {
   return found?.component || Calendar
 }
 
+const getTrackingType = (habit) => {
+  if (habit.trackingType === 'CHECK' || habit.trackingType === 'QUANTITY') return habit.trackingType
+  return habit.targetValue && habit.targetUnit ? 'QUANTITY' : 'CHECK'
+}
+
+const isQuantityHabit = (habit) => {
+  return getTrackingType(habit) === 'QUANTITY'
+}
+
 const getOrdinal = (n) => {
   const suffixes = ['th', 'st', 'nd', 'rd']
   const value = n % 100
@@ -198,7 +207,10 @@ onMounted(fetchScheduleData)
             <div class="min-w-0">
               <h4 class="m-0 truncate text-sm font-semibold text-stone-950">{{ habit.name }}</h4>
               <p class="m-0 mt-0.5 text-xs font-medium text-stone-500">
-                {{ habit.progress || 0 }} / {{ habit.targetValue || 1 }} {{ habit.targetUnit || '' }}
+                <span v-if="isQuantityHabit(habit)">
+                  {{ habit.progress || 0 }} / {{ habit.targetValue || 0 }} {{ habit.targetUnit || '' }}
+                </span>
+                <span v-else>Completion habit</span>
               </p>
             </div>
           </div>

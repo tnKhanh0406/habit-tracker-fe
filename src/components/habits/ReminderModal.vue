@@ -32,6 +32,15 @@ const getHabitIcon = (iconKey) => {
   return found?.component || Bell
 }
 
+const getTrackingType = (habit) => {
+  if (habit.trackingType === 'CHECK' || habit.trackingType === 'QUANTITY') return habit.trackingType
+  return habit.targetValue && habit.targetUnit ? 'QUANTITY' : 'CHECK'
+}
+
+const isQuantityHabit = (habit) => {
+  return getTrackingType(habit) === 'QUANTITY'
+}
+
 // Fetch reminders for the habit on mount
 const fetchRemindersData = async () => {
   loading.value = true
@@ -136,7 +145,10 @@ onMounted(fetchRemindersData)
           <div>
             <h4 class="text-sm font-semibold text-stone-950">{{ habit.name }}</h4>
             <div class="mt-0.5 flex items-center gap-2 text-xs font-medium text-stone-500">
-              <span>{{ habit.progress || 0 }} / {{ habit.targetValue || 1 }} {{ habit.targetUnit || '' }}</span>
+              <span v-if="isQuantityHabit(habit)">
+                {{ habit.progress || 0 }} / {{ habit.targetValue || 0 }} {{ habit.targetUnit || '' }}
+              </span>
+              <span v-else>Completion habit</span>
             </div>
           </div>
         </div>

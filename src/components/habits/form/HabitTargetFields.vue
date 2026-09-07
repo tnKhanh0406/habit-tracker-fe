@@ -16,7 +16,7 @@ const targetUnit = defineModel('targetUnit', { type: String, required: true })
         v-model.number="targetValue"
         class="h-11 rounded-md border border-stone-300 bg-white px-3 text-stone-900 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
         type="number"
-        min="0"
+        min="0.01"
         step="0.01"
         required
       />

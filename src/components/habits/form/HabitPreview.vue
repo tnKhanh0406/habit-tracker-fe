@@ -18,7 +18,11 @@ defineProps({
   },
   targetValue: {
     type: Number,
-    required: true,
+    default: null,
+  },
+  trackingType: {
+    type: String,
+    default: 'CHECK',
   },
 })
 </script>
@@ -31,7 +35,12 @@ defineProps({
       </span>
       <div>
         <p class="m-0 font-semibold text-stone-950">{{ name || 'Habit preview' }}</p>
-        <p class="m-0 text-sm text-stone-500">{{ targetValue }} {{ targetUnit || 'unit' }}</p>
+        <p class="m-0 text-sm text-stone-500">
+          <span v-if="trackingType === 'QUANTITY'">
+            {{ targetValue }} {{ targetUnit || 'unit' }}
+          </span>
+          <span v-else>Completion habit</span>
+        </p>
       </div>
     </div>
   </div>

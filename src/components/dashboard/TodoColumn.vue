@@ -13,7 +13,7 @@ import {
   Square,
   Trash2,
 } from 'lucide-vue-next'
-import { createTodoWithName, deleteTodo } from '@/api/todoApi'
+import { checkTodo, checkTodoSubtask, createTodoWithName, deleteTodo } from '@/api/todoApi'
 import DeleteTodoConfirmModal from '@/components/todos/DeleteTodoConfirmModal.vue'
 import UpdateTodoInformationModal from '@/components/todos/UpdateTodoInformationModal.vue'
 
@@ -35,6 +35,8 @@ const activeMenuTodoId = ref(null)
 const editingTodo = ref(null)
 const todoToDelete = ref(null)
 const deletingTodoId = ref(null)
+const updatingTodoId = ref(null)
+const updatingSubtaskKeys = ref(new Set())
 const errorMessage = ref('')
 
 const focusInput = () => {
@@ -58,14 +60,73 @@ const handleAddTodo = async () => {
   }
 }
 
-const toggleTodoCompletion = (todo) => {
-  todo.completed = !todo.completed
-  emit('todo-updated', todo)
+const toggleTodoCompletion = async (todo) => {
+  if (!todo?.id || updatingTodoId.value) return
+
+  const nextCompleted = !todo.completed
+  updatingTodoId.value = todo.id
+  errorMessage.value = ''
+
+  try {
+    const response = await checkTodo(todo.id, nextCompleted)
+    emit('todo-updated', {
+      ...todo,
+      completed: response.data?.completed ?? nextCompleted,
+      ...response.data,
+    })
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || err.message || 'Update todo status failed.'
+  } finally {
+    updatingTodoId.value = null
+  }
 }
 
-const toggleSubtask = (todo, subtask) => {
-  subtask.completed = !subtask.completed
-  emit('todo-updated', todo)
+const getSubtaskKey = (todoId, subtaskId) => `${todoId}:${subtaskId}`
+
+const isSubtaskUpdating = (todoId, subtaskId) => {
+  return updatingSubtaskKeys.value.has(getSubtaskKey(todoId, subtaskId))
+}
+
+const setSubtaskUpdating = (todoId, subtaskId, updating) => {
+  const nextKeys = new Set(updatingSubtaskKeys.value)
+  const key = getSubtaskKey(todoId, subtaskId)
+
+  if (updating) {
+    nextKeys.add(key)
+  } else {
+    nextKeys.delete(key)
+  }
+
+  updatingSubtaskKeys.value = nextKeys
+}
+
+const toggleSubtask = async (todo, subtask) => {
+  if (!todo?.id || !subtask?.id || isSubtaskUpdating(todo.id, subtask.id)) return
+
+  const nextCompleted = !subtask.completed
+  setSubtaskUpdating(todo.id, subtask.id, true)
+  errorMessage.value = ''
+
+  try {
+    const response = await checkTodoSubtask(todo.id, subtask.id, nextCompleted)
+    const updatedSubtask = {
+      ...subtask,
+      completed: response.data?.completed ?? nextCompleted,
+      ...response.data,
+    }
+    const updatedSubtasks = Array.isArray(todo.subtasks)
+      ? todo.subtasks.map((item) => (item.id === subtask.id ? updatedSubtask : item))
+      : []
+
+    emit('todo-updated', {
+      ...todo,
+      subtasks: updatedSubtasks,
+    })
+  } catch (err) {
+    errorMessage.value = err.response?.data?.message || err.message || 'Update subtask status failed.'
+  } finally {
+    setSubtaskUpdating(todo.id, subtask.id, false)
+  }
 }
 
 const toggleSubtasksPopover = (todoId) => {
@@ -283,7 +344,8 @@ onUnmounted(() => {
           <div class="flex min-w-0 flex-1 items-start gap-3">
             <button
               type="button"
-              class="mt-0.5 shrink-0 text-stone-300 transition hover:text-sky-800 active:translate-y-px"
+              class="mt-0.5 shrink-0 text-stone-300 transition hover:text-sky-800 active:translate-y-px disabled:cursor-wait disabled:opacity-45"
+              :disabled="updatingTodoId === todo.id"
               @click="toggleTodoCompletion(todo)"
             >
               <CheckSquare v-if="todo.completed" class="size-5 fill-sky-50 text-sky-800" />
@@ -337,7 +399,8 @@ onUnmounted(() => {
             v-for="subtask in getSortedSubtasks(todo.subtasks)"
             :key="subtask.id"
             type="button"
-            class="flex items-center gap-2 text-left text-xs font-medium text-stone-700 transition hover:text-sky-800"
+            class="flex items-center gap-2 text-left text-xs font-medium text-stone-700 transition hover:text-sky-800 disabled:cursor-wait disabled:opacity-45"
+            :disabled="isSubtaskUpdating(todo.id, subtask.id)"
             @click="toggleSubtask(todo, subtask)"
           >
             <CheckSquare v-if="subtask.completed" class="size-3.5 fill-sky-50 text-sky-800" />

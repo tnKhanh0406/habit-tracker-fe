@@ -17,6 +17,19 @@ import {
 
 export const HABIT_DIFFICULTIES = ['TRIVIAL', 'EASY', 'MEDIUM', 'HARD', 'EXTREME']
 
+export const HABIT_TRACKING_TYPES = [
+  {
+    value: 'CHECK',
+    label: 'Completion',
+    description: 'Chi can danh dau hoan thanh',
+  },
+  {
+    value: 'QUANTITY',
+    label: 'Amount',
+    description: 'Theo doi theo so luong',
+  },
+]
+
 export const HABIT_COLORS = [
   '#EF4444',
   '#F97316',
