@@ -5,7 +5,7 @@ export const getTodos = () => {
 }
 
 export const createTodoWithName = (title) => {
-  return api.post('/todos', {
+  return api.post('/todos/name', {
     name: title,
     title: title
   });

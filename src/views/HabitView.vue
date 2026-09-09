@@ -8,6 +8,7 @@ import TodoColumn from '@/components/dashboard/TodoColumn.vue'
 import RewardColumn from '@/components/dashboard/RewardColumn.vue'
 
 import UpdateCheckinModal from '@/components/habits/UpdateCheckinModal.vue'
+import CreateHabitModal from '@/components/habits/CreateHabitModal.vue'
 import UpdateHabitInformationModal from '@/components/habits/UpdateHabitInformationModal.vue'
 import ReminderModal from '@/components/habits/ReminderModal.vue'
 import ScheduleModal from '@/components/habits/ScheduleModal.vue'
@@ -26,6 +27,7 @@ const loading = ref(false)
 const error = ref(null)
 
 const activeCheckinHabit = ref(null)
+const creatingHabit = ref(false)
 const editingHabit = ref(null)
 const reminderHabit = ref(null)
 const scheduleHabit = ref(null)
@@ -208,6 +210,15 @@ const handleHabitCreated = (newHabit) => {
   habits.value.unshift(newHabit)
 }
 
+const handleFullHabitCreated = (newHabit) => {
+  handleHabitCreated(newHabit)
+  creatingHabit.value = false
+}
+
+const closeCreateHabitModal = () => {
+  creatingHabit.value = false
+}
+
 const handleTodoCreated = (newTodo) => {
   todos.value.unshift(newTodo)
 }
@@ -254,7 +265,7 @@ const handleRewardUpdated = (updatedReward) => {
 }
 
 const handleAddHabitFocus = () => {
-  if (habitColumnRef.value) habitColumnRef.value.focusInput()
+  creatingHabit.value = true
 }
 
 const handleAddTodoFocus = () => {
@@ -416,6 +427,12 @@ onMounted(fetchDashboardData)
       @add-progress="handleAddProgress"
       @update-progress="handleUpdateProgress"
       @cancel="closeCheckinModal"
+    />
+
+    <CreateHabitModal
+      v-if="creatingHabit"
+      @created="handleFullHabitCreated"
+      @cancel="closeCreateHabitModal"
     />
 
     <UpdateHabitInformationModal
