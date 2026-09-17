@@ -1,7 +1,6 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { Dumbbell } from 'lucide-vue-next'
-import { getCategories } from '@/api/categoryApi'
 import { createHabit } from '@/api/habitApi'
 import ModalShell from '@/components/common/ModalShell.vue'
 import {
@@ -23,6 +22,17 @@ import HabitTrackingTypeSelect from './form/HabitTrackingTypeSelect.vue'
 
 const emit = defineEmits(['created', 'cancel'])
 
+const props = defineProps({
+  categories: {
+    type: Array,
+    default: () => [],
+  },
+  loadingCategories: {
+    type: Boolean,
+    default: false,
+  },
+})
+
 const today = new Date().toISOString().split('T')[0]
 const form = reactive({
   name: '',
@@ -42,8 +52,6 @@ const form = reactive({
   reminders: [],
 })
 
-const categories = ref([])
-const loadingCategories = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 
@@ -74,25 +82,12 @@ const validateForm = () => {
   if (!form.color || !form.icon || !form.difficulty || !form.trackingType) {
     return 'Please fill in all required fields.'
   }
-  if (!form.categoryIds.length) return 'Please choose at least one category.'
   if (!form.startDate) return 'Start date is required.'
   if (form.trackingType === 'QUANTITY') {
     if (!Number(form.targetValue) || Number(form.targetValue) <= 0) return 'Target must be greater than 0.'
     if (!form.targetUnit.trim()) return 'Unit is required for amount tracking.'
   }
   return ''
-}
-
-const fetchCategories = async () => {
-  loadingCategories.value = true
-  try {
-    const response = await getCategories()
-    categories.value = Array.isArray(response.data) ? response.data : response.data?.content || []
-  } catch (error) {
-    errorMessage.value = error.message || 'Could not load categories.'
-  } finally {
-    loadingCategories.value = false
-  }
 }
 
 const submitForm = async () => {
@@ -137,7 +132,6 @@ const submitForm = async () => {
   }
 }
 
-fetchCategories()
 </script>
 
 <template>
@@ -165,7 +159,7 @@ fetchCategories()
       />
       <HabitColorPicker v-model="form.color" :colors="HABIT_COLORS" />
       <HabitIconPicker v-model="form.icon" :icons="HABIT_ICONS" />
-      <HabitCategoryPicker v-model="form.categoryIds" :categories="categories" :loading="loadingCategories" />
+      <HabitCategoryPicker v-model="form.categoryIds" :categories="props.categories" :loading="props.loadingCategories" />
 
       <fieldset class="grid gap-3 border-t border-stone-200 pt-4">
         <legend class="text-sm font-semibold text-stone-700">Schedule</legend>
@@ -229,7 +223,7 @@ fetchCategories()
       />
 
       <p v-if="errorMessage" class="m-0 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{{ errorMessage }}</p>
-      <FormActions :saving="saving || loadingCategories" @cancel="emit('cancel')" />
+      <FormActions :saving="saving || props.loadingCategories" @cancel="emit('cancel')" />
     </form>
   </ModalShell>
 </template>

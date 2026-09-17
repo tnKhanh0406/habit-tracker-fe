@@ -111,8 +111,8 @@ const handleSaveReminders = async () => {
       enabled: Boolean(r.enabled)
     }))
     
-    const res = await updateReminders(props.habit.id, requests)
-    emit('updated', res.data)
+    await updateReminders(props.habit.id, requests)
+    emit('updated', { habitId: props.habit.id })
     emit('cancel')
   } catch (err) {
     console.error('Failed to save reminders:', err)

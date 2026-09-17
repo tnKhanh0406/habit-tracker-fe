@@ -12,9 +12,11 @@ import CreateHabitModal from '@/components/habits/CreateHabitModal.vue'
 import UpdateHabitInformationModal from '@/components/habits/UpdateHabitInformationModal.vue'
 import ReminderModal from '@/components/habits/ReminderModal.vue'
 import ScheduleModal from '@/components/habits/ScheduleModal.vue'
+import UpdateTodoInformationModal from '@/components/todos/UpdateTodoInformationModal.vue'
 import UpdateRewardModal from '@/components/rewards/UpdateRewardModal.vue'
 
 import { getHabits } from '@/api/habitApi'
+import { getCategories } from '@/api/categoryApi'
 import { getTodos } from '@/api/todoApi'
 import { getRewards } from '@/api/rewardApi'
 
@@ -22,12 +24,16 @@ import { getRewards } from '@/api/rewardApi'
 const habits = ref([])
 const todos = ref([])
 const rewards = ref([])
+const categories = ref([])
+const loadingCategories = ref(false)
 
 const loading = ref(false)
 const error = ref(null)
 
 const activeCheckinHabit = ref(null)
 const creatingHabit = ref(false)
+const creatingTodo = ref(false)
+const creatingReward = ref(false)
 const editingHabit = ref(null)
 const reminderHabit = ref(null)
 const scheduleHabit = ref(null)
@@ -172,10 +178,12 @@ const fetchDashboardData = async () => {
   error.value = null
 
   try {
-    const [habitsRes, todosRes, rewardsRes] = await Promise.allSettled([
+    loadingCategories.value = true
+    const [habitsRes, todosRes, rewardsRes, categoriesRes] = await Promise.allSettled([
       getHabits(),
       getTodos(),
-      getRewards()
+      getRewards(),
+      getCategories(),
     ])
 
     if (habitsRes.status === 'fulfilled' && Array.isArray(habitsRes.value?.data) && habitsRes.value.data.length > 0) {
@@ -195,12 +203,22 @@ const fetchDashboardData = async () => {
     } else {
       rewards.value = initialFallbackRewards
     }
+
+    if (categoriesRes.status === 'fulfilled') {
+      categories.value = Array.isArray(categoriesRes.value?.data)
+        ? categoriesRes.value.data
+        : categoriesRes.value?.data?.content || []
+    } else {
+      categories.value = []
+    }
   } catch (err) {
     console.error('Error fetching dashboard data:', err)
     habits.value = initialFallbackHabits
     todos.value = initialFallbackTodos
     rewards.value = initialFallbackRewards
+    categories.value = []
   } finally {
+    loadingCategories.value = false
     loading.value = false
   }
 }
@@ -208,6 +226,10 @@ const fetchDashboardData = async () => {
 // Handlers for creation & focus
 const handleHabitCreated = (newHabit) => {
   habits.value.unshift(newHabit)
+}
+
+const handleHabitDeleted = (habitId) => {
+  habits.value = habits.value.filter((habit) => habit.id !== habitId)
 }
 
 const handleFullHabitCreated = (newHabit) => {
@@ -221,6 +243,15 @@ const closeCreateHabitModal = () => {
 
 const handleTodoCreated = (newTodo) => {
   todos.value.unshift(newTodo)
+}
+
+const handleFullTodoCreated = (newTodo) => {
+  handleTodoCreated(newTodo)
+  creatingTodo.value = false
+}
+
+const closeCreateTodoModal = () => {
+  creatingTodo.value = false
 }
 
 const handleTodoUpdated = (updatedTodo) => {
@@ -239,6 +270,15 @@ const handleTodoDeleted = (todoId) => {
 
 const handleRewardCreated = (newReward) => {
   rewards.value.unshift(newReward)
+}
+
+const handleFullRewardCreated = (newReward) => {
+  handleRewardCreated(newReward)
+  creatingReward.value = false
+}
+
+const closeCreateRewardModal = () => {
+  creatingReward.value = false
 }
 
 const handleRewardDeleted = (rewardId) => {
@@ -269,11 +309,11 @@ const handleAddHabitFocus = () => {
 }
 
 const handleAddTodoFocus = () => {
-  if (todoColumnRef.value) todoColumnRef.value.focusInput()
+  creatingTodo.value = true
 }
 
 const handleAddRewardFocus = () => {
-  if (rewardColumnRef.value) rewardColumnRef.value.focusInput()
+  creatingReward.value = true
 }
 
 // Checkin Modal Handlers
@@ -334,6 +374,24 @@ const openReminderModal = (habit) => {
 
 const closeReminderModal = () => {
   reminderHabit.value = null
+}
+
+const handleReminderUpdated = async ({ habitId } = {}) => {
+  closeReminderModal()
+
+  try {
+    const response = await getHabits()
+    const refreshedHabit = Array.isArray(response.data)
+      ? response.data.find((habit) => habit.id === habitId)
+      : null
+    const habitIndex = habits.value.findIndex((habit) => habit.id === habitId)
+
+    if (refreshedHabit && habitIndex !== -1) {
+      habits.value[habitIndex] = refreshedHabit
+    }
+  } catch (error) {
+    console.error('Failed to refresh habit after updating reminders:', error)
+  }
 }
 
 // Schedule Modal Handlers
@@ -397,6 +455,7 @@ onMounted(fetchDashboardData)
           ref="habitColumnRef"
           :habits="habits"
           @habit-created="handleHabitCreated"
+          @habit-deleted="handleHabitDeleted"
           @open-checkin="openCheckinModal"
           @open-information="openInformationModal"
           @open-schedule="openScheduleModal"
@@ -406,6 +465,8 @@ onMounted(fetchDashboardData)
         <TodoColumn
           ref="todoColumnRef"
           :todos="todos"
+          :categories="categories"
+          :loading-categories="loadingCategories"
           @todo-created="handleTodoCreated"
           @todo-updated="handleTodoUpdated"
           @todo-deleted="handleTodoDeleted"
@@ -431,13 +492,26 @@ onMounted(fetchDashboardData)
 
     <CreateHabitModal
       v-if="creatingHabit"
+      :categories="categories"
+      :loading-categories="loadingCategories"
       @created="handleFullHabitCreated"
       @cancel="closeCreateHabitModal"
+    />
+
+    <UpdateTodoInformationModal
+      v-if="creatingTodo"
+      mode="create"
+      :categories="categories"
+      :loading-categories="loadingCategories"
+      @created="handleFullTodoCreated"
+      @cancel="closeCreateTodoModal"
     />
 
     <UpdateHabitInformationModal
       v-if="editingHabit"
       :habit="editingHabit"
+      :categories="categories"
+      :loading-categories="loadingCategories"
       @updated="handleUpdatedInformation"
       @cancel="closeInformationModal"
     />
@@ -445,6 +519,7 @@ onMounted(fetchDashboardData)
     <ReminderModal
       v-if="reminderHabit"
       :habit="reminderHabit"
+      @updated="handleReminderUpdated"
       @cancel="closeReminderModal"
     />
 
@@ -460,6 +535,13 @@ onMounted(fetchDashboardData)
       :reward="editingReward"
       @updated="handleRewardUpdated"
       @cancel="closeRewardInformationModal"
+    />
+
+    <UpdateRewardModal
+      v-if="creatingReward"
+      mode="create"
+      @created="handleFullRewardCreated"
+      @cancel="closeCreateRewardModal"
     />
   </div>
 </template>

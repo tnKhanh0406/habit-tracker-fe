@@ -10,6 +10,10 @@ export const createRewardWithName = (name) => {
   });
 }
 
+export const createReward = (request) => {
+  return api.post('/rewards', request);
+}
+
 export const updateReward = (rewardId, request) => {
   return api.put(`/rewards/${rewardId}`, request);
 }

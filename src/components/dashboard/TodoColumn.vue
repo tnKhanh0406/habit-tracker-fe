@@ -16,11 +16,20 @@ import {
 import { checkTodo, checkTodoSubtask, createTodoWithName, deleteTodo } from '@/api/todoApi'
 import DeleteTodoConfirmModal from '@/components/todos/DeleteTodoConfirmModal.vue'
 import UpdateTodoInformationModal from '@/components/todos/UpdateTodoInformationModal.vue'
+import TodoReminderModal from '@/components/todos/TodoReminderModal.vue'
 
 const props = defineProps({
   todos: {
     type: Array,
     default: () => [],
+  },
+  categories: {
+    type: Array,
+    default: () => [],
+  },
+  loadingCategories: {
+    type: Boolean,
+    default: false,
   },
 })
 
@@ -33,6 +42,7 @@ const todoInputRef = ref(null)
 const openSubtasksId = ref(null)
 const activeMenuTodoId = ref(null)
 const editingTodo = ref(null)
+const reminderTodo = ref(null)
 const todoToDelete = ref(null)
 const deletingTodoId = ref(null)
 const updatingTodoId = ref(null)
@@ -148,6 +158,15 @@ const openTodoInformation = (todo) => {
 
 const closeTodoInformation = () => {
   editingTodo.value = null
+}
+
+const openTodoReminder = (todo) => {
+  reminderTodo.value = todo
+  closeTodoMenu()
+}
+
+const closeTodoReminder = () => {
+  reminderTodo.value = null
 }
 
 const handleTodoInformationUpdated = (todo) => {
@@ -323,10 +342,10 @@ onUnmounted(() => {
             </button>
             <button
               type="button"
-              class="flex w-full cursor-not-allowed items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-400"
-              disabled
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-50 hover:text-stone-950"
+              @click="openTodoReminder(todo)"
             >
-              <Bell :size="16" />
+              <Bell :size="16" class="text-sky-800" />
               Reminder
             </button>
             <button
@@ -420,8 +439,16 @@ onUnmounted(() => {
     <UpdateTodoInformationModal
       v-if="editingTodo"
       :todo="editingTodo"
+      :categories="props.categories"
+      :loading-categories="props.loadingCategories"
       @updated="handleTodoInformationUpdated"
       @cancel="closeTodoInformation"
+    />
+
+    <TodoReminderModal
+      v-if="reminderTodo"
+      :todo="reminderTodo"
+      @cancel="closeTodoReminder"
     />
 
     <DeleteTodoConfirmModal

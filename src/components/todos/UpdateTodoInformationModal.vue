@@ -1,8 +1,7 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { Calendar, Clock, FileText } from 'lucide-vue-next'
-import { getCategories } from '@/api/categoryApi'
-import { updateTodo } from '@/api/todoApi'
+import { createTodo, getTodoInformation, updateTodo } from '@/api/todoApi'
 import ModalShell from '@/components/common/ModalShell.vue'
 import FormActions from '@/components/habits/form/FormActions.vue'
 import HabitCategoryPicker from '@/components/habits/form/HabitCategoryPicker.vue'
@@ -13,11 +12,23 @@ import { HABIT_DIFFICULTIES } from '@/constants/habitOptions'
 const props = defineProps({
   todo: {
     type: Object,
-    required: true,
+    default: null,
+  },
+  mode: {
+    type: String,
+    default: 'update',
+  },
+  categories: {
+    type: Array,
+    default: () => [],
+  },
+  loadingCategories: {
+    type: Boolean,
+    default: false,
   },
 })
 
-const emit = defineEmits(['updated', 'cancel'])
+const emit = defineEmits(['created', 'updated', 'cancel'])
 
 const form = reactive({
   title: '',
@@ -29,9 +40,8 @@ const form = reactive({
   subtasks: [],
 })
 
-const categories = ref([])
-const loadingCategories = ref(false)
 const saving = ref(false)
+const loadingTodo = ref(false)
 const errorMessage = ref('')
 
 function toDateInput(value) {
@@ -84,12 +94,43 @@ function fillForm(todo) {
   form.subtasks = normalizeSubtasks(todo.subtasks)
 }
 
+function resetCreateForm() {
+  form.title = ''
+  form.description = ''
+  form.dueDate = ''
+  form.dueTime = ''
+  form.difficulty = 'EASY'
+  form.categoryIds = []
+  form.subtasks = []
+}
+
+async function fetchTodoInformation(todo) {
+  if (props.mode === 'create') {
+    resetCreateForm()
+    return
+  }
+  if (!todo?.id) return
+
+  loadingTodo.value = true
+  errorMessage.value = ''
+  fillForm(todo)
+
+  try {
+    const response = await getTodoInformation(todo.id)
+    fillForm({ ...todo, ...(response.data || {}) })
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || error.message || 'Could not load todo information.'
+  } finally {
+    loadingTodo.value = false
+  }
+}
+
 function buildPayload() {
   return {
     title: form.title.trim(),
     description: form.description.trim(),
-    dueDate: form.dueDate,
-    dueTime: toApiTime(form.dueTime),
+    dueDate: form.dueDate || null,
+    dueTime: form.dueTime ? toApiTime(form.dueTime) : null,
     difficulty: form.difficulty,
     categoryIds: form.categoryIds,
     subtasks: form.subtasks
@@ -105,24 +146,13 @@ function buildPayload() {
 
 function validateForm() {
   if (!form.title.trim()) return 'Title is required.'
-  if (!form.dueDate || !form.dueTime || !form.difficulty) return 'Please fill in all required fields.'
+  if (!form.difficulty) return 'Difficulty is required.'
   return ''
 }
 
-async function fetchCategories() {
-  loadingCategories.value = true
-
-  try {
-    const response = await getCategories()
-    categories.value = Array.isArray(response.data) ? response.data : response.data?.content || []
-  } catch (error) {
-    errorMessage.value = error.message || 'Could not load categories.'
-  } finally {
-    loadingCategories.value = false
-  }
-}
-
 async function submitForm() {
+  if (loadingTodo.value) return
+
   errorMessage.value = validateForm()
   if (errorMessage.value) return
 
@@ -130,15 +160,15 @@ async function submitForm() {
 
   try {
     const payload = buildPayload()
-    const response = await updateTodo(props.todo.id, payload)
+    const response = props.mode === 'create'
+      ? await createTodo(payload)
+      : await updateTodo(props.todo.id, payload)
 
-    emit('updated', {
-      ...props.todo,
-      ...payload,
-      ...response.data,
-    })
+    emit(props.mode === 'create' ? 'created' : 'updated', props.mode === 'create'
+      ? response.data
+      : { ...props.todo, ...payload, ...response.data })
   } catch (error) {
-    errorMessage.value = error.response?.data?.message || error.message || 'Update todo failed.'
+    errorMessage.value = error.response?.data?.message || error.message || `${props.mode === 'create' ? 'Create' : 'Update'} todo failed.`
   } finally {
     saving.value = false
   }
@@ -146,20 +176,23 @@ async function submitForm() {
 
 watch(
   () => props.todo,
-  (todo) => fillForm(todo),
+  (todo) => fetchTodoInformation(todo),
   { immediate: true },
 )
 
-onMounted(fetchCategories)
 </script>
 
 <template>
   <ModalShell
-    title="Update todo information"
-    subtitle="Edit the title, schedule, difficulty, categories and checklist."
+    :title="props.mode === 'create' ? 'Create todo' : 'Update todo information'"
+    :subtitle="props.mode === 'create' ? 'Create a todo with its schedule, categories and checklist.' : 'Edit the title, schedule, difficulty, categories and checklist.'"
     @close="emit('cancel')"
   >
     <form class="grid gap-5 px-5 py-5" @submit.prevent="submitForm">
+      <div v-if="loadingTodo" class="border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-800">
+        Loading todo information...
+      </div>
+
       <label class="grid gap-1.5">
         <span class="text-sm font-semibold text-stone-700">Title</span>
         <input
@@ -192,7 +225,6 @@ onMounted(fetchCategories)
             v-model="form.dueDate"
             type="date"
             class="h-11 rounded-md border border-stone-300 bg-white px-3 text-stone-900 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
-            required
           />
         </label>
 
@@ -205,20 +237,19 @@ onMounted(fetchCategories)
             v-model="form.dueTime"
             type="time"
             class="h-11 rounded-md border border-stone-300 bg-white px-3 text-stone-900 outline-none transition focus:border-teal-700 focus:ring-2 focus:ring-teal-100"
-            required
           />
         </label>
       </div>
 
       <HabitDifficultySelect v-model="form.difficulty" :difficulties="HABIT_DIFFICULTIES" />
-      <HabitCategoryPicker v-model="form.categoryIds" :categories="categories" :loading="loadingCategories" />
+      <HabitCategoryPicker v-model="form.categoryIds" :categories="props.categories" :loading="props.loadingCategories" />
       <TodoSubtasksEditor v-model="form.subtasks" />
 
       <p v-if="errorMessage" class="m-0 rounded-md bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
         {{ errorMessage }}
       </p>
 
-      <FormActions :saving="saving" @cancel="emit('cancel')" />
+      <FormActions :saving="saving || loadingTodo || props.loadingCategories" @cancel="emit('cancel')" />
     </form>
   </ModalShell>
 </template>

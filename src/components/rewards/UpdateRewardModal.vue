@@ -1,18 +1,22 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 import ModalShell from '@/components/common/ModalShell.vue'
-import { updateReward } from '@/api/rewardApi'
+import { createReward, updateReward } from '@/api/rewardApi'
 import { HABIT_ICONS } from '@/constants/habitOptions'
 import HabitIconPicker from '@/components/habits/form/HabitIconPicker.vue'
 
 const props = defineProps({
   reward: {
     type: Object,
-    required: true,
+    default: null,
+  },
+  mode: {
+    type: String,
+    default: 'update',
   },
 })
 
-const emit = defineEmits(['updated', 'cancel'])
+const emit = defineEmits(['created', 'updated', 'cancel'])
 
 const form = reactive({
   name: '',
@@ -29,6 +33,13 @@ const fillForm = (reward) => {
   const rewardIcon = reward.icon === 'tea' ? 'coffee' : reward.icon
   form.icon = HABIT_ICONS.some((icon) => icon.key === rewardIcon) ? rewardIcon : HABIT_ICONS[0].key
   form.cost = Number(reward.cost || 1)
+}
+
+const resetCreateForm = () => {
+  form.name = ''
+  form.description = ''
+  form.icon = HABIT_ICONS[0].key
+  form.cost = 1
 }
 
 const submitForm = async () => {
@@ -49,15 +60,15 @@ const submitForm = async () => {
       cost: Number(form.cost),
       type: 'CUSTOM',
     }
-    const response = await updateReward(props.reward.id, payload)
+    const response = props.mode === 'create'
+      ? await createReward(payload)
+      : await updateReward(props.reward.id, payload)
 
-    emit('updated', {
-      ...props.reward,
-      ...payload,
-      ...response.data,
-    })
+    emit(props.mode === 'create' ? 'created' : 'updated', props.mode === 'create'
+      ? response.data
+      : { ...props.reward, ...payload, ...response.data })
   } catch (error) {
-    errorMessage.value = error.response?.data?.message || error.message || 'Update reward failed.'
+    errorMessage.value = error.response?.data?.message || error.message || `${props.mode === 'create' ? 'Create' : 'Update'} reward failed.`
   } finally {
     saving.value = false
   }
@@ -65,15 +76,15 @@ const submitForm = async () => {
 
 watch(
   () => props.reward,
-  (reward) => fillForm(reward),
+  (reward) => props.mode === 'create' ? resetCreateForm() : fillForm(reward),
   { immediate: true },
 )
 </script>
 
 <template>
   <ModalShell
-    title="Update reward"
-    subtitle="Change the reward details shown on your dashboard."
+    :title="props.mode === 'create' ? 'Create reward' : 'Update reward'"
+    :subtitle="props.mode === 'create' ? 'Create a reward for your dashboard.' : 'Change the reward details shown on your dashboard.'"
     @close="emit('cancel')"
   >
     <form class="grid gap-4 px-5 py-5" @submit.prevent="submitForm">
@@ -107,6 +118,7 @@ watch(
             required
           />
         </label>
+
       </div>
 
       <HabitIconPicker v-model="form.icon" :icons="HABIT_ICONS" />
@@ -128,7 +140,7 @@ watch(
           class="rounded-md bg-amber-700 px-4 py-2 font-semibold text-white transition hover:bg-amber-600 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
           :disabled="saving"
         >
-          {{ saving ? 'Saving...' : 'Save changes' }}
+          {{ saving ? 'Saving...' : props.mode === 'create' ? 'Create reward' : 'Save changes' }}
         </button>
       </footer>
     </form>

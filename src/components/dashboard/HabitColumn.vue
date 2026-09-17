@@ -14,10 +14,12 @@ import {
   MoreVertical,
   Plus,
   Send,
+  Trash2,
 } from 'lucide-vue-next'
-import { createHabitWithName } from '@/api/habitApi'
+import { createHabitWithName, deleteHabit } from '@/api/habitApi'
 import { updateCompletion } from '@/api/habitCheckinApi'
 import { HABIT_ICONS, LEGACY_HABIT_ICON_MAP } from '@/constants/habitOptions'
+import DeleteHabitConfirmModal from '@/components/habits/DeleteHabitConfirmModal.vue'
 
 const props = defineProps({
   habits: {
@@ -33,6 +35,7 @@ const emit = defineEmits([
   'open-information',
   'open-schedule',
   'open-reminder',
+  'habit-deleted',
 ])
 
 const activeFilter = ref('All')
@@ -41,6 +44,9 @@ const isAdding = ref(false)
 const showCompleted = ref(false)
 const habitInputRef = ref(null)
 const activeMenuHabitId = ref(null)
+const habitToDelete = ref(null)
+const deletingHabitId = ref(null)
+const errorMessage = ref('')
 
 const focusInput = () => {
   habitInputRef.value?.focus()
@@ -103,6 +109,32 @@ const handleSelectSchedule = (habit) => {
 const handleSelectReminder = (habit) => {
   closeHabitMenu()
   emit('open-reminder', habit)
+}
+
+const requestDeleteHabit = (habit) => {
+  closeHabitMenu()
+  habitToDelete.value = habit
+}
+
+const closeDeleteHabit = () => {
+  if (deletingHabitId.value) return
+  habitToDelete.value = null
+}
+
+const confirmDeleteHabit = async () => {
+  if (!habitToDelete.value || deletingHabitId.value) return
+  deletingHabitId.value = habitToDelete.value.id
+  errorMessage.value = ''
+
+  try {
+    await deleteHabit(habitToDelete.value.id)
+    emit('habit-deleted', habitToDelete.value.id)
+    habitToDelete.value = null
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || error.message || 'Delete habit failed.'
+  } finally {
+    deletingHabitId.value = null
+  }
 }
 
 const filteredHabits = computed(() => {
@@ -235,6 +267,7 @@ onUnmounted(() => {
         :key="habit.id"
         :class="[
           'relative rounded-md border px-3 py-3 transition hover:shadow-[0_10px_24px_rgba(41,37,36,0.08)]',
+          activeMenuHabitId === habit.id && 'z-30',
           !isDueHabit(habit) && !habit.completed && 'opacity-55 hover:opacity-75',
           habit.completed && 'opacity-65',
         ]"
@@ -339,7 +372,7 @@ onUnmounted(() => {
 
             <div
               v-if="activeMenuHabitId === habit.id"
-              class="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-[0_16px_40px_rgba(41,37,36,0.14)]"
+              class="absolute right-0 z-50 mt-1 w-40 overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-[0_16px_40px_rgba(41,37,36,0.14)]"
             >
               <button
                 type="button"
@@ -365,6 +398,14 @@ onUnmounted(() => {
                 <Bell :size="16" class="text-teal-800" />
                 Reminder
               </button>
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50"
+                @click="requestDeleteHabit(habit)"
+              >
+                <Trash2 :size="16" />
+                Delete habit
+              </button>
             </div>
           </div>
         </div>
@@ -374,6 +415,10 @@ onUnmounted(() => {
         No habits match this view.
       </div>
     </div>
+
+    <p v-if="errorMessage" class="mt-3 border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+      {{ errorMessage }}
+    </p>
 
     <div v-if="completedHabitsCount > 0" class="mt-3 border-t border-stone-200 pt-3">
       <button
@@ -385,5 +430,13 @@ onUnmounted(() => {
         <component :is="showCompleted ? ChevronUp : ChevronDown" class="size-4" />
       </button>
     </div>
+
+    <DeleteHabitConfirmModal
+      v-if="habitToDelete"
+      :habit="habitToDelete"
+      :deleting="deletingHabitId === habitToDelete.id"
+      @confirm="confirmDeleteHabit"
+      @cancel="closeDeleteHabit"
+    />
   </section>
 </template>

@@ -4,6 +4,10 @@ export const getTodos = () => {
   return api.get('/todos');
 }
 
+export const getTodoInformation = (id) => {
+  return api.get(`/todos/${id}`);
+}
+
 export const createTodoWithName = (title) => {
   return api.post('/todos/name', {
     name: title,
@@ -12,7 +16,7 @@ export const createTodoWithName = (title) => {
 }
 
 export const createTodo = (request) => {
-  return api.post('/todos', { ...request });
+  return api.post('/todos', request);
 }
 
 export const updateTodo = (id, request) => {
@@ -29,4 +33,12 @@ export const checkTodoSubtask = (todoId, subtaskId, completed) => {
 
 export const deleteTodo = (id) => {
   return api.delete(`/todos/${id}`);
+}
+
+export const getTodoReminders = (todoId) => {
+  return api.get(`/todo-reminders/${todoId}`);
+}
+
+export const updateTodoReminders = (todoId, requests) => {
+  return api.put(`/todo-reminders/${todoId}`, requests);
 }

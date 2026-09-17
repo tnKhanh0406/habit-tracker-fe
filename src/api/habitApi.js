@@ -21,6 +21,10 @@ export const createHabit = (data) => {
   return api.post('/habits', data);
 }
 
+export const deleteHabit = (id) => {
+  return api.delete(`/habits/${id}`);
+}
+
 export const updateBasicHabitInformation = (id, data) => {
   return api.put(`/habits/basic/${id}`, data);
 }

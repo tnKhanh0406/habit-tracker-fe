@@ -1,7 +1,6 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Dumbbell } from 'lucide-vue-next'
-import { getCategories } from '@/api/categoryApi'
 import { getHabitDetail, updateBasicHabitInformation } from '@/api/habitApi'
 import ModalShell from '@/components/common/ModalShell.vue'
 import {
@@ -27,6 +26,14 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  categories: {
+    type: Array,
+    default: () => [],
+  },
+  loadingCategories: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['updated', 'cancel'])
@@ -43,8 +50,6 @@ const form = reactive({
   targetValue: null,
 })
 
-const categories = ref([])
-const loadingCategories = ref(false)
 const saving = ref(false)
 const loadingHabit = ref(false)
 const errorMessage = ref('')
@@ -151,21 +156,7 @@ function validateForm() {
     if (!Number(form.targetValue) || Number(form.targetValue) <= 0) return 'Target must be greater than 0.'
     if (!form.targetUnit.trim()) return 'Unit is required for amount tracking.'
   }
-  if (!form.categoryIds.length) return 'Please choose at least one category.'
   return ''
-}
-
-async function fetchCategories() {
-  loadingCategories.value = true
-
-  try {
-    const response = await getCategories()
-    categories.value = Array.isArray(response.data) ? response.data : response.data?.content || []
-  } catch (error) {
-    errorMessage.value = error.message || 'Khong the tai danh sach category.'
-  } finally {
-    loadingCategories.value = false
-  }
 }
 
 async function submitForm() {
@@ -196,7 +187,6 @@ watch(
   { immediate: true },
 )
 
-onMounted(fetchCategories)
 </script>
 
 <template>
@@ -228,7 +218,7 @@ onMounted(fetchCategories)
       />
       <HabitColorPicker v-model="form.color" :colors="HABIT_COLORS" />
       <HabitIconPicker v-model="form.icon" :icons="HABIT_ICONS" />
-      <HabitCategoryPicker v-model="form.categoryIds" :categories="categories" :loading="loadingCategories" />
+      <HabitCategoryPicker v-model="form.categoryIds" :categories="props.categories" :loading="props.loadingCategories" />
 
       <HabitPreview
         :name="form.name"
