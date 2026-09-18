@@ -1,4 +1,5 @@
 <script setup>
+import { computed, ref } from 'vue'
 import {
   Bell,
   Briefcase,
@@ -10,7 +11,25 @@ import {
   ShoppingBag,
   Trophy,
   Users,
+  LogOut,
+  Menu,
+  X,
 } from 'lucide-vue-next'
+import { RouterLink, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+const isMenuOpen = ref(false)
+
+const displayName = computed(() => auth.user?.username || auth.user?.email || 'Account')
+const initials = computed(() => displayName.value.slice(0, 1).toUpperCase())
+
+const logout = async () => {
+  auth.logout()
+  isMenuOpen.value = false
+  await router.replace({ name: 'login' })
+}
 </script>
 
 <template>
@@ -27,13 +46,13 @@ import {
         </div>
 
         <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
-          <a
-            href="/"
+          <RouterLink
+            to="/"
             class="inline-flex items-center gap-2 rounded-md bg-teal-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-800 active:translate-y-px"
           >
             <LayoutDashboard class="size-4" />
             Dashboard
-          </a>
+          </RouterLink>
 
           <button
             type="button"
@@ -98,13 +117,44 @@ import {
           <span class="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-[#f8f6f1]"></span>
         </button>
 
-        <div class="flex items-center gap-2">
+        <div class="hidden items-center gap-2 sm:flex">
           <div class="grid size-9 place-items-center rounded-md bg-stone-900 text-sm font-semibold text-white">
-            V
+            {{ initials }}
           </div>
-          <span class="hidden text-sm font-semibold text-stone-800 sm:inline">Ve Ve Ka</span>
+          <span class="text-sm font-semibold text-stone-800">{{ displayName }}</span>
         </div>
+
+        <button
+          type="button"
+          class="grid size-9 place-items-center rounded-md text-stone-500 transition hover:bg-stone-200/70 hover:text-stone-900 md:hidden"
+          :aria-expanded="isMenuOpen"
+          aria-label="Open navigation"
+          @click="isMenuOpen = !isMenuOpen"
+        >
+          <X v-if="isMenuOpen" class="size-5" />
+          <Menu v-else class="size-5" />
+        </button>
+
+        <button
+          type="button"
+          class="hidden items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-semibold text-stone-600 transition hover:bg-stone-200/70 hover:text-stone-950 sm:flex"
+          @click="logout"
+        >
+          <LogOut class="size-4" />
+          Sign out
+        </button>
       </div>
     </div>
+
+    <nav v-if="isMenuOpen" class="border-t border-stone-300/70 px-4 py-3 md:hidden" aria-label="Mobile navigation">
+      <RouterLink to="/" class="flex items-center gap-2 rounded-md bg-teal-900 px-3 py-2 text-sm font-semibold text-white" @click="isMenuOpen = false">
+        <LayoutDashboard class="size-4" />
+        Dashboard
+      </RouterLink>
+      <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-200/70" @click="logout">
+        <LogOut class="size-4" />
+        Sign out
+      </button>
+    </nav>
   </header>
 </template>
