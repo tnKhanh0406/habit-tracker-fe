@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/dashboard/Navbar.vue'
 import CharacterHeader from '@/components/dashboard/CharacterHeader.vue'
 import TodaySummary from '@/components/dashboard/TodaySummary.vue'
@@ -39,6 +39,12 @@ const reminderHabit = ref(null)
 const scheduleHabit = ref(null)
 const notificationMessage = ref('')
 const editingReward = ref(null)
+const characterExp = ref(750)
+const characterCoin = ref(1250)
+const characterLevel = ref(18)
+const rewardToast = ref(null)
+let rewardToastTimer = null
+const handledRewardSignatures = new Set()
 
 const habitColumnRef = ref(null)
 const todoColumnRef = ref(null)
@@ -245,6 +251,49 @@ const handleTodoCreated = (newTodo) => {
   todos.value.unshift(newTodo)
 }
 
+const applyReward = (reward) => {
+  if (!reward) return
+
+  const expDelta = Number(reward.expDelta || 0)
+  const coinDelta = Number(reward.coinDelta || 0)
+  const signature = [
+    expDelta,
+    coinDelta,
+    reward.currentExp,
+    reward.currentCoin,
+    reward.currentLevel,
+    Boolean(reward.levelUp),
+    Boolean(reward.levelDown),
+  ].join('|')
+
+  if (handledRewardSignatures.has(signature)) return
+  handledRewardSignatures.add(signature)
+
+  if (reward.currentExp !== undefined && reward.currentExp !== null) {
+    characterExp.value = Number(reward.currentExp)
+  }
+  if (reward.currentCoin !== undefined && reward.currentCoin !== null) {
+    characterCoin.value = Number(reward.currentCoin)
+  }
+  if (reward.currentLevel !== undefined && reward.currentLevel !== null) {
+    characterLevel.value = Number(reward.currentLevel)
+  }
+
+  if (expDelta === 0 && coinDelta === 0) return
+
+  rewardToast.value = {
+    expDelta,
+    coinDelta,
+    levelUp: Boolean(reward.levelUp),
+    levelDown: Boolean(reward.levelDown),
+  }
+
+  if (rewardToastTimer) window.clearTimeout(rewardToastTimer)
+  rewardToastTimer = window.setTimeout(() => {
+    rewardToast.value = null
+  }, 3600)
+}
+
 const handleFullTodoCreated = (newTodo) => {
   handleTodoCreated(newTodo)
   creatingTodo.value = false
@@ -255,6 +304,7 @@ const closeCreateTodoModal = () => {
 }
 
 const handleTodoUpdated = (updatedTodo) => {
+  applyReward(updatedTodo?.reward)
   const idx = todos.value.findIndex(t => t.id === updatedTodo.id)
   if (idx !== -1) {
     todos.value[idx] = {
@@ -327,6 +377,7 @@ const closeCheckinModal = () => {
 
 const updateHabitFromCheckinResponse = (response) => {
   if (!response) return
+  applyReward(response.reward)
   const targetId = response.habitId || activeCheckinHabit.value?.id
   const habit = habits.value.find(h => h.id === targetId)
   if (habit) {
@@ -334,6 +385,17 @@ const updateHabitFromCheckinResponse = (response) => {
     if (response.completed !== undefined) habit.completed = response.completed
     if (response.currentStreak !== undefined) habit.currentStreak = response.currentStreak
     if (response.targetValue !== undefined) habit.targetValue = response.targetValue
+  }
+}
+
+const handleHabitUpdated = (updatedHabit) => {
+  applyReward(updatedHabit?.reward)
+  const idx = habits.value.findIndex(h => h.id === updatedHabit.id)
+  if (idx !== -1) {
+    habits.value[idx] = {
+      ...habits.value[idx],
+      ...updatedHabit,
+    }
   }
 }
 
@@ -357,13 +419,7 @@ const closeInformationModal = () => {
 }
 
 const handleUpdatedInformation = (updatedHabit) => {
-  const idx = habits.value.findIndex(h => h.id === updatedHabit.id)
-  if (idx !== -1) {
-    habits.value[idx] = {
-      ...habits.value[idx],
-      ...updatedHabit
-    }
-  }
+  handleHabitUpdated(updatedHabit)
   closeInformationModal()
 }
 
@@ -414,6 +470,10 @@ const handleScheduleUpdated = (scheduleData) => {
 }
 
 onMounted(fetchDashboardData)
+
+onUnmounted(() => {
+  if (rewardToastTimer) window.clearTimeout(rewardToastTimer)
+})
 </script>
 
 <template>
@@ -421,7 +481,11 @@ onMounted(fetchDashboardData)
     <Navbar />
 
     <main class="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8">
-      <CharacterHeader />
+      <CharacterHeader
+        :current-exp="characterExp"
+        :current-coin="characterCoin"
+        :current-level="characterLevel"
+      />
 
       <TodaySummary
         :habits-completed="habitsCompletedText"
@@ -455,6 +519,7 @@ onMounted(fetchDashboardData)
           ref="habitColumnRef"
           :habits="habits"
           @habit-created="handleHabitCreated"
+          @habit-updated="handleHabitUpdated"
           @habit-deleted="handleHabitDeleted"
           @open-checkin="openCheckinModal"
           @open-information="openInformationModal"
@@ -543,5 +608,53 @@ onMounted(fetchDashboardData)
       @created="handleFullRewardCreated"
       @cancel="closeCreateRewardModal"
     />
+
+    <Transition name="reward-toast">
+      <aside
+        v-if="rewardToast"
+        class="fixed right-3 top-3 z-[70] w-[min(22rem,calc(100vw-1.5rem))] rounded-md border border-stone-200 bg-white px-4 py-3 shadow-[0_18px_45px_rgba(41,37,36,0.18)] sm:right-5 sm:top-5"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <p class="m-0 text-sm font-bold text-stone-950">
+              {{ rewardToast.levelUp ? 'Level Up' : rewardToast.levelDown ? 'Level Down' : 'Reward received' }}
+            </p>
+            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold">
+              <span
+                v-if="rewardToast.expDelta !== 0"
+                :class="rewardToast.expDelta > 0 ? 'text-emerald-700' : 'text-red-700'"
+              >
+                {{ rewardToast.expDelta > 0 ? '+' : '' }}{{ rewardToast.expDelta }} EXP
+              </span>
+              <span
+                v-if="rewardToast.coinDelta !== 0"
+                :class="rewardToast.coinDelta > 0 ? 'text-emerald-700' : 'text-red-700'"
+              >
+                {{ rewardToast.coinDelta > 0 ? '+' : '' }}{{ rewardToast.coinDelta }} coin
+              </span>
+            </div>
+          </div>
+          <span
+            class="mt-1 size-2 shrink-0 rounded-full"
+            :class="rewardToast.expDelta > 0 || rewardToast.coinDelta > 0 ? 'bg-emerald-500' : 'bg-red-500'"
+          ></span>
+        </div>
+      </aside>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.reward-toast-enter-active,
+.reward-toast-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.reward-toast-enter-from,
+.reward-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) translateX(8px);
+}
+</style>

@@ -46,6 +46,7 @@ const habitInputRef = ref(null)
 const activeMenuHabitId = ref(null)
 const habitToDelete = ref(null)
 const deletingHabitId = ref(null)
+const updatingHabitId = ref(null)
 const errorMessage = ref('')
 
 const focusInput = () => {
@@ -70,15 +71,25 @@ const handleAddHabit = async () => {
 }
 
 const toggleHabitCompletion = async (habit) => {
+  if (!habit?.id || updatingHabitId.value) return
+  updatingHabitId.value = habit.id
+  errorMessage.value = ''
+
   try {
     const res = await updateCompletion(habit.id, !habit.completed)
     habit.completed = res.data?.completed ?? !habit.completed
     if (res.data?.currentStreak !== undefined) {
       habit.currentStreak = res.data.currentStreak
     }
-    emit('habit-updated', habit)
+    emit('habit-updated', {
+      ...habit,
+      ...res.data,
+    })
   } catch (err) {
     console.error('Failed to update habit completion:', err)
+    errorMessage.value = err.response?.data?.message || err.message || 'Update habit status failed.'
+  } finally {
+    updatingHabitId.value = null
   }
 }
 
@@ -349,7 +360,7 @@ onUnmounted(() => {
               <button
                 type="button"
                 :class="[
-                  'grid size-9 place-items-center rounded-md text-white transition active:translate-y-px',
+                  'grid size-9 place-items-center rounded-md text-white transition active:translate-y-px disabled:cursor-wait disabled:opacity-60',
                   habit.completed ? 'bg-emerald-700 hover:bg-emerald-600' : 'bg-teal-800 hover:bg-teal-700',
                 ]"
                 :aria-label="habit.completed ? 'Mark habit incomplete' : 'Mark habit complete'"

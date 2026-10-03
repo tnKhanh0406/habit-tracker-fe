@@ -14,6 +14,21 @@ import {
   Sword,
   Zap,
 } from 'lucide-vue-next'
+
+const props = defineProps({
+  currentExp: {
+    type: Number,
+    default: 750,
+  },
+  currentCoin: {
+    type: Number,
+    default: 1250,
+  },
+  currentLevel: {
+    type: Number,
+    default: 18,
+  },
+})
 </script>
 
 <template>
@@ -36,7 +51,10 @@ import {
               <Edit2 class="size-4" />
             </button>
             <span class="rounded-sm border border-teal-800/15 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
-              Mage level 18
+              Mage level {{ props.currentLevel }}
+            </span>
+            <span class="rounded-sm border border-amber-800/15 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
+              {{ props.currentCoin.toLocaleString() }} coins
             </span>
           </div>
 
@@ -73,10 +91,10 @@ import {
                   <Star class="size-3.5 fill-amber-500" />
                   EXP
                 </span>
-                <span>750 / 1,000</span>
+                <span>{{ props.currentExp.toLocaleString() }}</span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-sm bg-amber-100">
-                <div class="h-full rounded-sm bg-amber-500" style="width: 75%"></div>
+                <div class="h-full rounded-sm bg-amber-500" :style="{ width: `${Math.min(props.currentExp / 1000 * 100, 100)}%` }"></div>
               </div>
             </div>
           </div>
