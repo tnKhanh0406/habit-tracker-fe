@@ -17,11 +17,11 @@ import {
 defineProps({
   habitsCompleted: {
     type: String,
-    default: '5 / 8',
+    default: '0 / 0',
   },
   todosCompleted: {
     type: String,
-    default: '2 / 4',
+    default: '0 / 0',
   },
 })
 
@@ -31,8 +31,8 @@ const isMenuOpen = ref(false)
 const menuRef = ref(null)
 
 const metrics = [
-  { label: 'Habits', valueKey: 'habitsCompleted', fallback: '5 / 8', icon: CheckCircle2, color: 'text-emerald-700' },
-  { label: 'Todos', valueKey: 'todosCompleted', fallback: '2 / 4', icon: ListTodo, color: 'text-sky-700' },
+  { label: 'Habits', valueKey: 'habitsCompleted', icon: CheckCircle2, color: 'text-emerald-700' },
+  { label: 'Todos', valueKey: 'todosCompleted', icon: ListTodo, color: 'text-sky-700' },
   { label: 'EXP', value: '+320', icon: Star, color: 'text-amber-700' },
   { label: 'Coins', value: '+145', icon: Coins, color: 'text-orange-700' },
   { label: 'Damage', value: '590', icon: Swords, color: 'text-teal-800' },

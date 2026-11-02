@@ -2,33 +2,57 @@
 import {
   ArrowRight,
   BookOpen,
-  ChevronDown,
   Clover,
   Droplet,
   Edit2,
   Heart,
-  Search,
   Shield,
   Sparkles,
   Star,
   Sword,
   Zap,
 } from 'lucide-vue-next'
+import { computed } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const displayName = computed(() => auth.user?.username || auth.user?.email || 'Account')
 
 const props = defineProps({
-  currentExp: {
-    type: Number,
-    default: 750,
+  character: {
+    type: Object,
+    default: null,
   },
-  currentCoin: {
-    type: Number,
-    default: 1250,
+  loading: {
+    type: Boolean,
+    default: false,
   },
-  currentLevel: {
-    type: Number,
-    default: 18,
+  error: {
+    type: String,
+    default: '',
   },
 })
+
+const emit = defineEmits(['allocate-stat', 'open-skills'])
+
+const statDefinitions = [
+  { key: 'strength', label: 'STR', icon: Sword, color: 'text-red-600' },
+  { key: 'intelligence', label: 'INT', icon: BookOpen, color: 'text-teal-700' },
+  { key: 'vitality', label: 'VIT', icon: Shield, color: 'text-sky-700' },
+  { key: 'agility', label: 'AGI', icon: Clover, color: 'text-emerald-700' },
+]
+
+const progressPercent = (value, max) => {
+  const current = Number(value || 0)
+  const maximum = Number(max || 0)
+  if (maximum <= 0) return 0
+  return Math.min(Math.max((current / maximum) * 100, 0), 100)
+}
+
+const formatNumber = (value) => {
+  if (value === undefined || value === null) return '-'
+  return Number(value).toLocaleString()
+}
 </script>
 
 <template>
@@ -46,17 +70,22 @@ const props = defineProps({
 
         <div class="min-w-0 flex-1">
           <div class="mb-4 flex flex-wrap items-center gap-2">
-            <h2 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-stone-950">Ve Ve Ka</h2>
+            <h2 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-stone-950">{{ displayName }}</h2>
             <button type="button" class="text-stone-400 transition hover:text-stone-700" aria-label="Edit profile">
               <Edit2 class="size-4" />
             </button>
             <span class="rounded-sm border border-teal-800/15 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
-              Mage level {{ props.currentLevel }}
+              {{ props.character?.characterClass || 'Choose class' }} level {{ props.character?.level ?? '-' }}
             </span>
             <span class="rounded-sm border border-amber-800/15 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
-              {{ props.currentCoin.toLocaleString() }} coins
+              {{ formatNumber(props.character?.coin) }} coins
             </span>
           </div>
+
+          <p v-if="props.loading" class="m-0 mb-3 text-xs font-medium text-stone-500">Loading character...</p>
+          <p v-else-if="props.error" class="m-0 mb-3 rounded-md bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">
+            {{ props.error }}
+          </p>
 
           <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div class="space-y-1">
@@ -65,10 +94,10 @@ const props = defineProps({
                   <Heart class="size-3.5 fill-red-600" />
                   HP
                 </span>
-                <span>80 / 100</span>
+                <span>{{ formatNumber(props.character?.hp) }} / {{ formatNumber(props.character?.maxHp) }}</span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-sm bg-red-100">
-                <div class="h-full rounded-sm bg-red-600" style="width: 80%"></div>
+                <div class="h-full rounded-sm bg-red-600" :style="{ width: `${progressPercent(props.character?.hp, props.character?.maxHp)}%` }"></div>
               </div>
             </div>
 
@@ -78,10 +107,10 @@ const props = defineProps({
                   <Droplet class="size-3.5 fill-sky-600" />
                   MP
                 </span>
-                <span>45 / 70</span>
+                <span>{{ formatNumber(props.character?.mp) }} / {{ formatNumber(props.character?.maxMp) }}</span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-sm bg-sky-100">
-                <div class="h-full rounded-sm bg-sky-700" style="width: 64%"></div>
+                <div class="h-full rounded-sm bg-sky-700" :style="{ width: `${progressPercent(props.character?.mp, props.character?.maxMp)}%` }"></div>
               </div>
             </div>
 
@@ -91,52 +120,42 @@ const props = defineProps({
                   <Star class="size-3.5 fill-amber-500" />
                   EXP
                 </span>
-                <span>{{ props.currentExp.toLocaleString() }}</span>
+                <span>{{ formatNumber(props.character?.exp) }} / {{ formatNumber(props.character?.nextLevelExp) }}</span>
               </div>
               <div class="h-2 w-full overflow-hidden rounded-sm bg-amber-100">
-                <div class="h-full rounded-sm bg-amber-500" :style="{ width: `${Math.min(props.currentExp / 1000 * 100, 100)}%` }"></div>
+                <div class="h-full rounded-sm bg-amber-500" :style="{ width: `${progressPercent(props.character?.exp, props.character?.nextLevelExp)}%` }"></div>
               </div>
             </div>
           </div>
 
           <div class="mt-5 flex flex-col gap-4 border-t border-stone-200 pt-4 md:flex-row md:items-center md:justify-between">
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-semibold text-stone-600">
-              <span class="flex items-center gap-1.5">
-                <Sword class="size-4 text-red-600" />
-                STR <strong class="font-semibold text-stone-950">12</strong>
+              <span v-for="stat in statDefinitions" :key="stat.key" class="inline-flex items-center gap-1.5">
+                <component :is="stat.icon" :class="['size-4', stat.color]" />
+                {{ stat.label }} <strong class="font-semibold text-stone-950">{{ formatNumber(props.character?.[stat.key]) }}</strong>
+                <button
+                  type="button"
+                  class="grid size-5 place-items-center rounded border border-stone-300 bg-white text-stone-500 transition hover:border-teal-700 hover:text-teal-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  :disabled="!props.character?.statPoints || props.loading"
+                  :aria-label="`Allocate 1 point to ${stat.label}`"
+                  @click="emit('allocate-stat', stat.key.toUpperCase())"
+                >
+                  +
+                </button>
               </span>
-              <span class="flex items-center gap-1.5">
-                <BookOpen class="size-4 text-teal-700" />
-                INT <strong class="font-semibold text-stone-950">25</strong>
-              </span>
-              <span class="flex items-center gap-1.5">
-                <Shield class="size-4 text-sky-700" />
-                DEF <strong class="font-semibold text-stone-950">14</strong>
-              </span>
-              <span class="flex items-center gap-1.5">
-                <Clover class="size-4 text-emerald-700" />
-                LUCK <strong class="font-semibold text-stone-950">8</strong>
-              </span>
+              <span class="text-teal-800">Points: {{ formatNumber(props.character?.statPoints) }}</span>
             </div>
 
-            <div class="flex w-full items-center gap-2 md:w-auto">
-              <div class="relative min-w-0 flex-1 md:w-56">
-                <Search class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-                <input
-                  type="text"
-                  placeholder="Search all tasks"
-                  class="h-9 w-full rounded-md border border-stone-300 bg-white py-1.5 pl-9 pr-3 text-sm font-medium text-stone-800 placeholder:text-stone-400 transition focus:border-teal-700 focus:outline-none"
-                />
-              </div>
+            <button
+              type="button"
+              class="inline-flex items-center justify-center gap-2 rounded-md bg-teal-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
+              :disabled="props.loading || !props.character"
+              @click="emit('open-skills')"
+            >
+              <Sparkles class="size-4" />
+              {{ props.character?.characterClass ? 'Skills' : 'Choose class' }}
+            </button>
 
-              <button
-                type="button"
-                class="inline-flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 transition hover:bg-stone-100 active:translate-y-px"
-              >
-                All categories
-                <ChevronDown class="size-3.5 text-stone-400" />
-              </button>
-            </div>
           </div>
         </div>
       </div>

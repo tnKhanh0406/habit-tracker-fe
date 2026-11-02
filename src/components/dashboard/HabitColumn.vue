@@ -26,6 +26,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  totalHabits: {
+    type: Number,
+    default: 0,
+  },
 })
 
 const emit = defineEmits([
@@ -234,7 +238,7 @@ onUnmounted(() => {
     <div class="mb-4 flex items-center justify-between gap-3 border-b border-stone-200 pb-3">
       <div class="flex items-center gap-2">
         <Activity class="size-4.5 text-orange-700" />
-        <h3 class="m-0 text-base font-semibold tracking-[-0.01em] text-stone-950">Habits</h3>
+        <h3 class="m-0 text-base font-semibold tracking-[-0.01em] text-stone-950">Habits ({{ props.totalHabits }})</h3>
       </div>
 
       <div class="flex items-center gap-0.5 rounded-md bg-stone-100 p-0.5 text-xs font-medium">

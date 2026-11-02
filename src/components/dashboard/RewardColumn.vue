@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { BookOpen, CheckCircle, Coffee, Coins, Gamepad2, Gift, Info, MoreVertical, Send, Trash2, Tv } from 'lucide-vue-next'
-import { createRewardWithName, deleteReward } from '@/api/rewardApi'
+import { createRewardWithName, deleteReward, redeemReward } from '@/api/rewardApi'
 import DeleteRewardConfirmModal from '@/components/rewards/DeleteRewardConfirmModal.vue'
 
 const props = defineProps({
@@ -18,6 +18,7 @@ const newRewardName = ref('')
 const isAdding = ref(false)
 const rewardInputRef = ref(null)
 const redeemedId = ref(null)
+const redeemingId = ref(null)
 const activeMenuRewardId = ref(null)
 const deletingId = ref(null)
 const rewardToDelete = ref(null)
@@ -43,12 +44,24 @@ const handleAddReward = async () => {
   }
 }
 
-const handleRedeem = (reward) => {
-  redeemedId.value = reward.id
-  setTimeout(() => {
-    redeemedId.value = null
-  }, 2000)
-  emit('reward-redeemed', reward)
+const handleRedeem = async (reward) => {
+  if (!reward?.id || redeemingId.value) return
+
+  redeemingId.value = reward.id
+  errorMessage.value = ''
+
+  try {
+    const response = await redeemReward(reward.id)
+    redeemedId.value = reward.id
+    emit('reward-redeemed', { reward, coin: Number(response.data) })
+    window.setTimeout(() => {
+      if (redeemedId.value === reward.id) redeemedId.value = null
+    }, 2000)
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || error.message || 'Redeem reward failed.'
+  } finally {
+    redeemingId.value = null
+  }
 }
 
 const toggleRewardMenu = (rewardId) => {
@@ -235,11 +248,12 @@ onUnmounted(() => {
           <button
             type="button"
             :class="[
-              'shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition active:translate-y-px',
+              'shrink-0 rounded-md px-3 py-2 text-xs font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60',
               redeemedId === reward.id
                 ? 'bg-emerald-700 text-white'
                 : 'border border-stone-300 bg-white text-stone-700 hover:border-amber-700 hover:text-amber-800',
             ]"
+            :disabled="redeemingId === reward.id"
             @click="handleRedeem(reward)"
           >
             <span class="inline-flex items-center gap-1">

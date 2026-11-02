@@ -12,6 +12,7 @@ export const useAuthStore = defineStore('auth', () => {
   const status = ref('initializing')
   const authError = ref('')
   const initialized = ref(false)
+  const loginPenalty = ref(null)
 
   const isAuthenticated = computed(() => status.value === 'authenticated')
 
@@ -60,12 +61,14 @@ export const useAuthStore = defineStore('auth', () => {
       throw new Error('The server did not return an access token.')
     }
 
+    loginPenalty.value = response.data?.penalty ?? null
     setAccessToken(token)
     const currentUser = await loadCurrentUser(true)
 
     if (!currentUser) {
       const verificationError = authError.value || 'Could not verify your account.'
       clearAccessToken()
+      loginPenalty.value = null
       authError.value = ''
       status.value = 'unauthenticated'
       initialized.value = true
@@ -81,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = () => {
     clearAccessToken()
+    loginPenalty.value = null
     user.value = null
     authError.value = ''
     status.value = 'unauthenticated'
@@ -89,6 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const handleUnauthorized = () => {
     clearAccessToken()
+    loginPenalty.value = null
     user.value = null
     authError.value = ''
     status.value = 'unauthenticated'
@@ -99,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
     user,
     status,
     authError,
+    loginPenalty,
     initialized,
     isAuthenticated,
     loadCurrentUser,

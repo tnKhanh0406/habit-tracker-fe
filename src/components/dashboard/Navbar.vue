@@ -22,6 +22,13 @@ const auth = useAuthStore()
 const router = useRouter()
 const isMenuOpen = ref(false)
 
+const props = defineProps({
+  character: {
+    type: Object,
+    default: null,
+  },
+})
+
 const displayName = computed(() => auth.user?.username || auth.user?.email || 'Account')
 const initials = computed(() => displayName.value.slice(0, 1).toUpperCase())
 
@@ -100,11 +107,11 @@ const logout = async () => {
         <div class="hidden items-center gap-3 border-r border-stone-300 pr-3 sm:flex">
           <div class="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700">
             <Coins class="size-4 text-amber-600" />
-            <span>1,250</span>
+            <span>{{ props.character?.coin?.toLocaleString() ?? '-' }}</span>
           </div>
           <div class="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700">
             <Gem class="size-4 text-teal-700" />
-            <span>35</span>
+            <span>{{ props.character?.gem?.toLocaleString() ?? '-' }}</span>
           </div>
         </div>
 

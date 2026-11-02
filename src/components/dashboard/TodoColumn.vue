@@ -23,6 +23,10 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  totalTodos: {
+    type: Number,
+    default: 0,
+  },
   categories: {
     type: Array,
     default: () => [],
@@ -270,7 +274,7 @@ onUnmounted(() => {
     <div class="mb-4 flex items-center justify-between gap-3 border-b border-stone-200 pb-3">
       <div class="flex items-center gap-2">
         <ListTodo class="size-4.5 text-sky-800" />
-        <h3 class="m-0 text-base font-semibold tracking-[-0.01em] text-stone-950">Todos</h3>
+        <h3 class="m-0 text-base font-semibold tracking-[-0.01em] text-stone-950">Todos ({{ props.totalTodos }})</h3>
       </div>
 
       <div class="flex items-center gap-0.5 overflow-x-auto rounded-md bg-stone-100 p-0.5 text-xs font-medium">

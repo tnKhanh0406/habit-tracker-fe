@@ -2,10 +2,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import Navbar from '@/components/dashboard/Navbar.vue'
 import CharacterHeader from '@/components/dashboard/CharacterHeader.vue'
-import TodaySummary from '@/components/dashboard/TodaySummary.vue'
+import DashboardToolbar from '@/components/dashboard/DashboardToolbar.vue'
 import HabitColumn from '@/components/dashboard/HabitColumn.vue'
 import TodoColumn from '@/components/dashboard/TodoColumn.vue'
 import RewardColumn from '@/components/dashboard/RewardColumn.vue'
+import CategoryManagerModal from '@/components/categories/CategoryManagerModal.vue'
+import SkillPanel from '@/components/rpg/skills/SkillPanel.vue'
 
 import UpdateCheckinModal from '@/components/habits/UpdateCheckinModal.vue'
 import CreateHabitModal from '@/components/habits/CreateHabitModal.vue'
@@ -16,9 +18,13 @@ import UpdateTodoInformationModal from '@/components/todos/UpdateTodoInformation
 import UpdateRewardModal from '@/components/rewards/UpdateRewardModal.vue'
 
 import { getHabits } from '@/api/habitApi'
+import { allocateCharacterStat, getCharacter } from '@/api/characterApi'
 import { getCategories } from '@/api/categoryApi'
 import { getTodos } from '@/api/todoApi'
 import { getRewards } from '@/api/rewardApi'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
 
 // State
 const habits = ref([])
@@ -29,6 +35,13 @@ const loadingCategories = ref(false)
 
 const loading = ref(false)
 const error = ref(null)
+const character = ref(null)
+const characterLoading = ref(false)
+const characterError = ref('')
+const allocatingStat = ref(false)
+const managingCategories = ref(false)
+const showingSkills = ref(false)
+const searchQuery = ref('')
 
 const activeCheckinHabit = ref(null)
 const creatingHabit = ref(false)
@@ -39,144 +52,68 @@ const reminderHabit = ref(null)
 const scheduleHabit = ref(null)
 const notificationMessage = ref('')
 const editingReward = ref(null)
-const characterExp = ref(750)
-const characterCoin = ref(1250)
-const characterLevel = ref(18)
 const rewardToast = ref(null)
 let rewardToastTimer = null
+const penaltyToast = ref(null)
+let penaltyToastTimer = null
 const handledRewardSignatures = new Set()
 
 const habitColumnRef = ref(null)
 const todoColumnRef = ref(null)
 const rewardColumnRef = ref(null)
 
-// Fallback initial data matching design mockup if API is empty or offline
-const initialFallbackHabits = [
-  {
-    id: 'h1',
-    name: 'Run 5km',
-    icon: 'bike',
-    color: '#f97316',
-    trackingType: 'QUANTITY',
-    status: 'ACTIVE',
-    targetUnit: 'km',
-    targetValue: 5,
-    progress: 3.2,
-    completed: false,
-    isScheduledToday: true,
-    currentStreak: 14
-  },
-  {
-    id: 'h2',
-    name: 'Read 30 minutes',
-    icon: 'book',
-    color: '#3b82f6',
-    trackingType: 'QUANTITY',
-    status: 'ACTIVE',
-    targetUnit: 'min',
-    targetValue: 30,
-    progress: 20,
-    completed: false,
-    isScheduledToday: true,
-    currentStreak: 6
-  },
-  {
-    id: 'h3',
-    name: 'Meditate',
-    icon: 'sprout',
-    color: '#10b981',
-    trackingType: 'CHECK',
-    status: 'ACTIVE',
-    targetUnit: null,
-    targetValue: null,
-    progress: 0,
-    completed: true,
-    isScheduledToday: true,
-    currentStreak: 8
+const matchesSearch = (item, fields) => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  if (!query) return true
+  const categoryText = Array.isArray(item?.categories)
+    ? item.categories.map((category) => category.name).join(' ')
+    : ''
+  const subtaskText = Array.isArray(item?.subtasks)
+    ? item.subtasks.map((subtask) => subtask.title).join(' ')
+    : ''
+  return [...fields.map((field) => item?.[field]), categoryText, subtaskText]
+    .some((value) => String(value || '').toLocaleLowerCase().includes(query))
+}
+
+const filteredHabits = computed(() => habits.value.filter((habit) => matchesSearch(habit, ['name', 'description', 'icon', 'trackingType'])))
+const filteredTodos = computed(() => todos.value.filter((todo) => matchesSearch(todo, ['title', 'description', 'difficulty'])))
+const filteredRewards = computed(() => rewards.value.filter((reward) => matchesSearch(reward, ['name', 'description', 'icon', 'type'])))
+
+const normalizeCharacterResponse = (response) => {
+  const data = response?.data?.data || response?.data?.character || response?.data
+  if (!data || typeof data !== 'object' || data.level === undefined) return null
+  return data
+}
+
+const applyLoginPenalty = (penalty) => {
+  if (!penalty || Number(penalty.hpDelta) >= 0 || !character.value) return
+
+  if (penalty.currentHp !== undefined && penalty.currentHp !== null) {
+    character.value.hp = Number(penalty.currentHp)
   }
-]
 
-const initialFallbackTodos = [
-  {
-    id: 't1',
-    title: 'Finish Habit Tracker UI',
-    completed: false,
-    dueDate: '2026-05-25',
-    dueTime: '23:59',
-    subtasks: [
-      { id: 's1', title: 'checklist step 1', completed: true, position: 1 },
-      { id: 's2', title: 'checklist step 2', completed: true, position: 2 },
-      { id: 's3', title: 'checklist step 3', completed: true, position: 3 }
-    ]
-  },
-  {
-    id: 't2',
-    title: 'Call dentist',
-    completed: false,
-    dueDate: '2026-05-26',
-    dueTime: '19:00',
-    subtasks: []
-  },
-  {
-    id: 't3',
-    title: 'Submit Assignment',
-    completed: false,
-    dueDate: new Date().toISOString().split('T')[0],
-    dueTime: '23:00',
-    subtasks: []
-  },
-  {
-    id: 't4',
-    title: 'Buy groceries',
-    completed: false,
-    dueDate: new Date().toISOString().split('T')[0],
-    dueTime: '12:00',
-    subtasks: []
-  },
-  {
-    id: 't5',
-    title: 'Prepare team presentation',
-    completed: false,
-    dueDate: new Date().toISOString().split('T')[0],
-    dueTime: '17:00',
-    subtasks: [
-      { id: 's4', title: 'Slide outline', completed: true, position: 1 },
-      { id: 's5', title: 'Review notes', completed: false, position: 2 }
-    ]
+  const today = new Date().toISOString().slice(0, 10)
+  const userKey = auth.user?.id || auth.user?.email || 'current-user'
+  const storageKey = `habit-tracker-penalty:${userKey}:${today}`
+
+  try {
+    if (window.sessionStorage.getItem(storageKey)) return
+    window.sessionStorage.setItem(storageKey, 'shown')
+  } catch (storageError) {
+    console.warn('Could not persist login penalty notification state:', storageError)
   }
-]
 
-const initialFallbackRewards = [
-  {
-    id: 'r1',
-    name: 'Milk Tea Treat',
-    description: 'A sweet bubble tea reward',
-    icon: 'tea',
-    cost: 120,
-    type: 'CUSTOM'
-  },
-  {
-    id: 'r2',
-    name: 'Mystery Book',
-    description: 'A random new book for your collection',
-    icon: 'book',
-    cost: 300,
-    type: 'SYSTEM'
+  penaltyToast.value = {
+    hpDelta: Number(penalty.hpDelta),
+    missedHabits: Number(penalty.missedHabits || 0),
+    overdueTodos: Number(penalty.overdueTodos || 0),
   }
-]
 
-// Computed Summary Stats
-const habitsCompletedText = computed(() => {
-  const comp = habits.value.filter(h => h.completed).length
-  const total = habits.value.length
-  return total > 0 ? `${comp} / ${total}` : '5 / 8'
-})
-
-const todosCompletedText = computed(() => {
-  const comp = todos.value.filter(t => t.completed).length
-  const total = todos.value.length
-  return total > 0 ? `${comp} / ${total}` : '2 / 4'
-})
+  if (penaltyToastTimer) window.clearTimeout(penaltyToastTimer)
+  penaltyToastTimer = window.setTimeout(() => {
+    penaltyToast.value = null
+  }, 5000)
+}
 
 // Fetch all dashboard data (only on page mount)
 const fetchDashboardData = async () => {
@@ -185,29 +122,31 @@ const fetchDashboardData = async () => {
 
   try {
     loadingCategories.value = true
-    const [habitsRes, todosRes, rewardsRes, categoriesRes] = await Promise.allSettled([
+    characterLoading.value = true
+    const [habitsRes, todosRes, rewardsRes, categoriesRes, characterRes] = await Promise.allSettled([
       getHabits(),
       getTodos(),
       getRewards(),
       getCategories(),
+      getCharacter(),
     ])
 
     if (habitsRes.status === 'fulfilled' && Array.isArray(habitsRes.value?.data) && habitsRes.value.data.length > 0) {
       habits.value = habitsRes.value.data
     } else {
-      habits.value = initialFallbackHabits
+      habits.value = []
     }
 
     if (todosRes.status === 'fulfilled' && Array.isArray(todosRes.value?.data) && todosRes.value.data.length > 0) {
       todos.value = todosRes.value.data
     } else {
-      todos.value = initialFallbackTodos
+      todos.value = []
     }
 
     if (rewardsRes.status === 'fulfilled' && Array.isArray(rewardsRes.value?.data) && rewardsRes.value.data.length > 0) {
       rewards.value = rewardsRes.value.data
     } else {
-      rewards.value = initialFallbackRewards
+      rewards.value = []
     }
 
     if (categoriesRes.status === 'fulfilled') {
@@ -217,14 +156,36 @@ const fetchDashboardData = async () => {
     } else {
       categories.value = []
     }
+
+    const characterData = characterRes.status === 'fulfilled'
+      ? normalizeCharacterResponse(characterRes.value)
+      : null
+
+    console.log('[Character API] settled result:', characterRes)
+    console.log('[Character API] raw response data:', characterRes.status === 'fulfilled' ? characterRes.value?.data : null)
+    console.log('[Character API] normalized character:', characterData)
+
+    if (characterData) {
+      character.value = characterData
+      characterError.value = ''
+      applyLoginPenalty(auth.loginPenalty)
+    } else {
+      character.value = null
+      characterError.value = characterRes.status === 'rejected'
+        ? `Could not load character data (${characterRes.reason?.response?.status || 'network error'}).`
+        : 'Character data is unavailable. Check the character API response.'
+    }
   } catch (err) {
     console.error('Error fetching dashboard data:', err)
-    habits.value = initialFallbackHabits
-    todos.value = initialFallbackTodos
-    rewards.value = initialFallbackRewards
+    habits.value = []
+    todos.value = []
+    rewards.value = []
     categories.value = []
+    character.value = null
+    characterError.value = err.message || 'Could not load character data.'
   } finally {
     loadingCategories.value = false
+    characterLoading.value = false
     loading.value = false
   }
 }
@@ -269,14 +230,16 @@ const applyReward = (reward) => {
   if (handledRewardSignatures.has(signature)) return
   handledRewardSignatures.add(signature)
 
-  if (reward.currentExp !== undefined && reward.currentExp !== null) {
-    characterExp.value = Number(reward.currentExp)
-  }
-  if (reward.currentCoin !== undefined && reward.currentCoin !== null) {
-    characterCoin.value = Number(reward.currentCoin)
-  }
-  if (reward.currentLevel !== undefined && reward.currentLevel !== null) {
-    characterLevel.value = Number(reward.currentLevel)
+  if (character.value) {
+    if (reward.currentExp !== undefined && reward.currentExp !== null) {
+      character.value.exp = Number(reward.currentExp)
+    }
+    if (reward.currentCoin !== undefined && reward.currentCoin !== null) {
+      character.value.coin = Number(reward.currentCoin)
+    }
+    if (reward.currentLevel !== undefined && reward.currentLevel !== null) {
+      character.value.level = Number(reward.currentLevel)
+    }
   }
 
   if (expDelta === 0 && coinDelta === 0) return
@@ -327,6 +290,12 @@ const handleFullRewardCreated = (newReward) => {
   creatingReward.value = false
 }
 
+const handleRewardRedeemed = ({ coin } = {}) => {
+  if (character.value && Number.isFinite(coin)) {
+    character.value.coin = coin
+  }
+}
+
 const closeCreateRewardModal = () => {
   creatingReward.value = false
 }
@@ -364,6 +333,47 @@ const handleAddTodoFocus = () => {
 
 const handleAddRewardFocus = () => {
   creatingReward.value = true
+}
+
+const handleAllocateStat = async (stat) => {
+  if (!character.value?.statPoints || allocatingStat.value) return
+
+  allocatingStat.value = true
+  characterError.value = ''
+
+  try {
+    const response = await allocateCharacterStat(stat, 1)
+    if (response.data && character.value) {
+      character.value = {
+        ...character.value,
+        ...response.data,
+      }
+    }
+  } catch (allocationError) {
+    characterError.value = allocationError.response?.data?.message
+      || allocationError.message
+      || 'Could not allocate stat point.'
+  } finally {
+    allocatingStat.value = false
+  }
+}
+
+const handleCharacterUpdated = (updatedCharacter) => {
+  if (!updatedCharacter) return
+  character.value = { ...character.value, ...updatedCharacter }
+}
+
+const openCategoryManager = () => {
+  managingCategories.value = true
+}
+
+const closeCategoryManager = () => {
+  if (!loadingCategories.value) managingCategories.value = false
+}
+
+const handleCategoriesUpdated = (updatedCategories) => {
+  categories.value = Array.isArray(updatedCategories) ? updatedCategories : []
+  managingCategories.value = false
 }
 
 // Checkin Modal Handlers
@@ -473,26 +483,30 @@ onMounted(fetchDashboardData)
 
 onUnmounted(() => {
   if (rewardToastTimer) window.clearTimeout(rewardToastTimer)
+  if (penaltyToastTimer) window.clearTimeout(penaltyToastTimer)
 })
 </script>
 
 <template>
   <div class="min-h-dvh pb-14 text-stone-800 antialiased">
-    <Navbar />
+    <Navbar :character="character" />
 
     <main class="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8">
       <CharacterHeader
-        :current-exp="characterExp"
-        :current-coin="characterCoin"
-        :current-level="characterLevel"
+        :character="character"
+        :loading="characterLoading || allocatingStat"
+        :error="characterError"
+        @allocate-stat="handleAllocateStat"
+        @open-skills="showingSkills = true"
       />
 
-      <TodaySummary
-        :habits-completed="habitsCompletedText"
-        :todos-completed="todosCompletedText"
+      <DashboardToolbar
+        v-model:search="searchQuery"
+        :categories="categories"
         @add-habit="handleAddHabitFocus"
         @add-todo="handleAddTodoFocus"
         @add-reward="handleAddRewardFocus"
+        @manage-categories="openCategoryManager"
       />
 
       <div v-if="loading" class="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -517,7 +531,8 @@ onUnmounted(() => {
       <div v-else class="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
         <HabitColumn
           ref="habitColumnRef"
-          :habits="habits"
+          :habits="filteredHabits"
+          :total-habits="habits.length"
           @habit-created="handleHabitCreated"
           @habit-updated="handleHabitUpdated"
           @habit-deleted="handleHabitDeleted"
@@ -529,7 +544,8 @@ onUnmounted(() => {
 
         <TodoColumn
           ref="todoColumnRef"
-          :todos="todos"
+          :todos="filteredTodos"
+          :total-todos="todos.length"
           :categories="categories"
           :loading-categories="loadingCategories"
           @todo-created="handleTodoCreated"
@@ -539,8 +555,9 @@ onUnmounted(() => {
 
         <RewardColumn
           ref="rewardColumnRef"
-          :rewards="rewards"
+          :rewards="filteredRewards"
           @reward-created="handleRewardCreated"
+          @reward-redeemed="handleRewardRedeemed"
           @reward-information="openRewardInformationModal"
           @reward-deleted="handleRewardDeleted"
         />
@@ -609,6 +626,43 @@ onUnmounted(() => {
       @cancel="closeCreateRewardModal"
     />
 
+    <CategoryManagerModal
+      v-if="managingCategories"
+      :categories="categories"
+      :loading="loadingCategories"
+      @updated="handleCategoriesUpdated"
+      @cancel="closeCategoryManager"
+    />
+
+    <SkillPanel
+      v-if="showingSkills && character"
+      :character="character"
+      :todos="todos"
+      :habits="habits"
+      @character-updated="handleCharacterUpdated"
+      @close="showingSkills = false"
+    />
+
+    <Transition name="penalty-toast">
+      <aside
+        v-if="penaltyToast"
+        class="fixed right-3 top-3 z-[71] w-[min(22rem,calc(100vw-1.5rem))] rounded-md border border-red-200 bg-white px-4 py-3 shadow-[0_18px_45px_rgba(127,29,29,0.18)] sm:right-5 sm:top-5"
+        role="status"
+        aria-live="polite"
+      >
+        <p class="m-0 text-sm font-bold text-red-800">Login penalty</p>
+        <p class="m-0 mt-1 text-lg font-bold text-red-700">{{ penaltyToast.hpDelta }} HP</p>
+        <div class="mt-1 grid gap-0.5 text-xs font-semibold text-stone-600">
+          <span v-if="penaltyToast.missedHabits > 0">
+            {{ penaltyToast.missedHabits }} habit{{ penaltyToast.missedHabits === 1 ? '' : 's' }} missed
+          </span>
+          <span v-if="penaltyToast.overdueTodos > 0">
+            {{ penaltyToast.overdueTodos }} todo{{ penaltyToast.overdueTodos === 1 ? '' : 's' }} overdue
+          </span>
+        </div>
+      </aside>
+    </Transition>
+
     <Transition name="reward-toast">
       <aside
         v-if="rewardToast"
@@ -654,6 +708,17 @@ onUnmounted(() => {
 
 .reward-toast-enter-from,
 .reward-toast-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) translateX(8px);
+}
+
+.penalty-toast-enter-active,
+.penalty-toast-leave-active {
+  transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.penalty-toast-enter-from,
+.penalty-toast-leave-to {
   opacity: 0;
   transform: translateY(-8px) translateX(8px);
 }
