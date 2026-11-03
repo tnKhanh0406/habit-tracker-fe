@@ -18,6 +18,7 @@ import UpdateTodoInformationModal from '@/components/todos/UpdateTodoInformation
 import UpdateRewardModal from '@/components/rewards/UpdateRewardModal.vue'
 
 import { getHabits } from '@/api/habitApi'
+import { getSkills } from '@/api/skillApi'
 import { allocateCharacterStat, getCharacter } from '@/api/characterApi'
 import { getCategories } from '@/api/categoryApi'
 import { getTodos } from '@/api/todoApi'
@@ -41,6 +42,14 @@ const characterError = ref('')
 const allocatingStat = ref(false)
 const managingCategories = ref(false)
 const showingSkills = ref(false)
+const skills = ref([])
+const updateSkills = (items) => {
+  const receivedAt = Date.now()
+  skills.value = items.map((skill) => ({
+    ...skill,
+    cooldownEndsAt: receivedAt + Number(skill.remainingCooldownSeconds || 0) * 1000,
+  }))
+}
 const searchQuery = ref('')
 
 const activeCheckinHabit = ref(null)
@@ -123,13 +132,15 @@ const fetchDashboardData = async () => {
   try {
     loadingCategories.value = true
     characterLoading.value = true
-    const [habitsRes, todosRes, rewardsRes, categoriesRes, characterRes] = await Promise.allSettled([
+    const [habitsRes, todosRes, rewardsRes, categoriesRes, characterRes, skillsRes] = await Promise.allSettled([
       getHabits(),
       getTodos(),
       getRewards(),
       getCategories(),
       getCharacter(),
+      getSkills(),
     ])
+    if (skillsRes.status === 'fulfilled') updateSkills(skillsRes.value.data || [])
 
     if (habitsRes.status === 'fulfilled' && Array.isArray(habitsRes.value?.data) && habitsRes.value.data.length > 0) {
       habits.value = habitsRes.value.data
@@ -639,6 +650,8 @@ onUnmounted(() => {
       :character="character"
       :todos="todos"
       :habits="habits"
+      :cached-skills="skills"
+      @skills-updated="updateSkills"
       @character-updated="handleCharacterUpdated"
       @close="showingSkills = false"
     />

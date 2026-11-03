@@ -17,7 +17,6 @@ const emit = defineEmits(['add-progress', 'update-progress', 'cancel'])
 const activeMode = ref('add')
 const amountToAdd = ref(1)
 const setProgressValue = ref(Number(props.habit.progress || 0))
-const autoMarkComplete = ref(true)
 const saving = ref(false)
 const errorMessage = ref('')
 
@@ -206,19 +205,6 @@ watch(
           </div>
         </section>
 
-        <label class="flex cursor-pointer items-start gap-2.5 text-sm font-medium text-stone-700">
-          <input
-            v-model="autoMarkComplete"
-            type="checkbox"
-            class="mt-1 rounded border-stone-300 text-teal-700 focus:ring-teal-700"
-          />
-          <span>
-            Mark complete when the target is reached
-            <span class="block text-xs font-normal text-stone-500">
-              The backend marks completion automatically when progress reaches the target.
-            </span>
-          </span>
-        </label>
 
         <p v-if="errorMessage" class="border border-red-200 bg-red-50 p-2.5 text-sm font-semibold text-red-700">
           {{ errorMessage }}
@@ -260,14 +246,6 @@ watch(
             </span>
           </div>
 
-          <input
-            v-model.number="setProgressValue"
-            type="range"
-            min="0"
-            :max="targetVal"
-            step="any"
-            class="w-full cursor-pointer accent-teal-800"
-          />
           <div class="flex justify-between text-xs font-medium text-stone-500">
             <span>0</span>
             <span>Target: {{ targetVal }} {{ targetUnitStr }}</span>
