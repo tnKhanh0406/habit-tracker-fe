@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HabitView from '../views/HabitView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
+import ShopView from '@/views/ShopView.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
@@ -11,6 +12,12 @@ const router = createRouter({
       path: '/',
       name: 'habits',
       component: HabitView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/shop',
+      name: 'shop',
+      component: ShopView,
       meta: { requiresAuth: true },
     },
     {

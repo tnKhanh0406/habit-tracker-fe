@@ -15,12 +15,13 @@ import {
   Menu,
   X,
 } from 'lucide-vue-next'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const emit = defineEmits(['open-profile', 'open-inventory'])
 const router = useRouter()
+const route = useRoute()
 const isMenuOpen = ref(false)
 
 const props = defineProps({
@@ -56,7 +57,7 @@ const logout = async () => {
         <nav class="hidden items-center gap-1 md:flex" aria-label="Primary navigation">
           <RouterLink
             to="/"
-            class="inline-flex items-center gap-2 rounded-md bg-teal-900 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-teal-800 active:translate-y-px"
+            :class="['inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition active:translate-y-px', route.name === 'habits' ? 'bg-teal-900 text-white hover:bg-teal-800' : 'text-stone-600 hover:bg-stone-200/70 hover:text-stone-950']"
           >
             <LayoutDashboard class="size-4" />
             Dashboard
@@ -86,13 +87,13 @@ const logout = async () => {
             Party
           </button>
 
-          <button
-            type="button"
-            class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200/70 hover:text-stone-950 active:translate-y-px"
+          <RouterLink
+            to="/shop"
+            :class="['inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition active:translate-y-px', route.name === 'shop' ? 'bg-teal-900 text-white hover:bg-teal-800' : 'text-stone-600 hover:bg-stone-200/70 hover:text-stone-950']"
           >
-            <ShoppingBag class="size-4 text-stone-400" />
+            <ShoppingBag :class="['size-4', route.name === 'shop' ? 'text-white' : 'text-stone-400']" />
             Shop
-          </button>
+          </RouterLink>
 
           <button
             type="button"
@@ -157,10 +158,11 @@ const logout = async () => {
     </div>
 
     <nav v-if="isMenuOpen" class="border-t border-stone-300/70 px-4 py-3 md:hidden" aria-label="Mobile navigation">
-      <RouterLink to="/" class="flex items-center gap-2 rounded-md bg-teal-900 px-3 py-2 text-sm font-semibold text-white" @click="isMenuOpen = false">
+      <RouterLink to="/" :class="['flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', route.name === 'habits' ? 'bg-teal-900 text-white' : 'text-stone-600']" @click="isMenuOpen = false">
         <LayoutDashboard class="size-4" />
         Dashboard
       </RouterLink>
+      <RouterLink to="/shop" :class="['mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', route.name === 'shop' ? 'bg-teal-900 text-white' : 'text-stone-600']" @click="isMenuOpen = false"><ShoppingBag class="size-4" />Shop</RouterLink>
       <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600" @click="emit('open-inventory'); isMenuOpen = false"><Briefcase class="size-4" />Inventory</button>
       <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-200/70" @click="logout">
         <LogOut class="size-4" />
