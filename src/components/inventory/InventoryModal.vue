@@ -2,12 +2,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { Box, Droplets, Heart, LoaderCircle, PackageOpen, Shield, Sparkles, Sword } from 'lucide-vue-next'
 import ModalShell from '@/components/common/ModalShell.vue'
-import { getInventory, useInventoryItem } from '@/api/inventoryApi'
+import { equipInventoryItem, getInventory, unequipInventoryItem, useInventoryItem } from '@/api/inventoryApi'
 
 const emit = defineEmits(['close', 'character-updated'])
 const items = ref([])
 const loading = ref(true)
 const usingId = ref(null)
+const changingEquipmentId = ref(null)
 const error = ref('')
 const message = ref('')
 const filter = ref('ALL')
@@ -38,6 +39,21 @@ const useItem = async (item) => {
   } catch (requestError) {
     error.value = requestError.response?.data?.message || 'Could not use item.'
   } finally { usingId.value = null }
+}
+
+const changeEquipment = async (item) => {
+  changingEquipmentId.value = item.inventoryItemId
+  error.value = ''
+  message.value = ''
+  try {
+    const request = item.equipped ? unequipInventoryItem : equipInventoryItem
+    const character = (await request(item.inventoryItemId)).data
+    await load()
+    emit('character-updated', character)
+    message.value = `${item.name} ${item.equipped ? 'unequipped' : 'equipped'}.`
+  } catch (requestError) {
+    error.value = requestError.response?.data?.message || 'Could not change equipment.'
+  } finally { changingEquipmentId.value = null }
 }
 
 const itemIcon = (item) => {
@@ -79,11 +95,11 @@ onMounted(load)
         <PackageOpen class="size-8 text-stone-300" /><p class="text-sm">No items in this category.</p>
       </div>
       <div v-else class="grid gap-3 sm:grid-cols-2">
-        <article v-for="item in visibleItems" :key="item.inventoryItemId" class="flex flex-col rounded-md border border-stone-200 bg-white p-3">
+        <article v-for="item in visibleItems" :key="item.inventoryItemId" :class="['flex flex-col rounded-md border bg-white p-3', item.equipped ? 'border-teal-500 ring-1 ring-teal-100' : 'border-stone-200']">
           <div class="flex gap-3">
             <div class="grid size-10 shrink-0 place-items-center rounded-md bg-stone-100"><component :is="itemIcon(item)" class="size-5 text-teal-700" /></div>
             <div class="min-w-0 flex-1">
-              <div class="flex items-start justify-between gap-2"><h3 class="m-0 text-sm font-semibold text-stone-900">{{ item.name }}</h3><span class="rounded bg-stone-100 px-1.5 py-0.5 text-xs font-semibold">×{{ item.quantity }}</span></div>
+              <div class="flex items-start justify-between gap-2"><h3 class="m-0 text-sm font-semibold text-stone-900">{{ item.name }}</h3><span v-if="item.equipped" class="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-teal-800">Equipped</span><span v-else class="rounded bg-stone-100 px-1.5 py-0.5 text-xs font-semibold">×{{ item.quantity }}</span></div>
               <p class="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-stone-400">{{ item.rarity }} · {{ item.equipment?.slot || item.itemType }}</p>
             </div>
           </div>
@@ -93,7 +109,9 @@ onMounted(load)
           <button v-if="item.itemType === 'CONSUMABLE'" type="button" :disabled="!!usingId" class="mt-auto self-end rounded-md bg-teal-800 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50" @click="useItem(item)">
             <LoaderCircle v-if="usingId === item.inventoryItemId" class="mr-1 inline size-3 animate-spin" />Use
           </button>
-          <span v-else class="mt-auto self-end pt-2 text-xs font-medium text-stone-400">Equip available in the next feature</span>
+          <button v-else type="button" :disabled="!!changingEquipmentId" :class="['mt-auto self-end rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-50', item.equipped ? 'border border-stone-300 text-stone-600' : 'bg-teal-800 text-white']" @click="changeEquipment(item)">
+            <LoaderCircle v-if="changingEquipmentId === item.inventoryItemId" class="mr-1 inline size-3 animate-spin" />{{ item.equipped ? 'Unequip' : 'Equip' }}
+          </button>
         </article>
       </div>
     </div>
