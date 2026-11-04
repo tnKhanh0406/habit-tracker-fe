@@ -140,7 +140,7 @@ const formatCooldown = (seconds) => {
       <p v-if="success" class="m-0 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">{{ success }}</p>
 
       <template v-if="!character.characterClass">
-        <p class="m-0 text-sm text-stone-600">Class selection is permanent in this MVP.</p>
+        <p class="m-0 text-sm text-stone-600">Choose your class. You can change it in Profile after 7 days.</p>
         <div class="grid gap-3 sm:grid-cols-2">
           <button
             v-for="item in classes"

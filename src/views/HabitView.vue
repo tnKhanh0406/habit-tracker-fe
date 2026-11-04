@@ -8,6 +8,8 @@ import TodoColumn from '@/components/dashboard/TodoColumn.vue'
 import RewardColumn from '@/components/dashboard/RewardColumn.vue'
 import CategoryManagerModal from '@/components/categories/CategoryManagerModal.vue'
 import SkillPanel from '@/components/rpg/skills/SkillPanel.vue'
+import ProfileModal from '@/components/ProfileModal.vue'
+import InventoryModal from '@/components/inventory/InventoryModal.vue'
 
 import UpdateCheckinModal from '@/components/habits/UpdateCheckinModal.vue'
 import CreateHabitModal from '@/components/habits/CreateHabitModal.vue'
@@ -42,6 +44,12 @@ const characterError = ref('')
 const allocatingStat = ref(false)
 const managingCategories = ref(false)
 const showingSkills = ref(false)
+const showingProfile = ref(false)
+const showingInventory = ref(false)
+const profileCharacterUpdated = async (data) => {
+  handleCharacterUpdated(data)
+  updateSkills((await getSkills()).data || [])
+}
 const skills = ref([])
 const updateSkills = (items) => {
   const receivedAt = Date.now()
@@ -100,6 +108,7 @@ const applyLoginPenalty = (penalty) => {
   if (penalty.currentHp !== undefined && penalty.currentHp !== null) {
     character.value.hp = Number(penalty.currentHp)
   }
+  if (penalty.currentCoin != null) character.value.coin = Number(penalty.currentCoin)
 
   const today = new Date().toISOString().slice(0, 10)
   const userKey = auth.user?.id || auth.user?.email || 'current-user'
@@ -113,6 +122,9 @@ const applyLoginPenalty = (penalty) => {
   }
 
   penaltyToast.value = {
+    knockedOut: penalty.knockedOut,
+    coinLost: penalty.coinLost,
+    currentHp: penalty.currentHp,
     hpDelta: Number(penalty.hpDelta),
     missedHabits: Number(penalty.missedHabits || 0),
     overdueTodos: Number(penalty.overdueTodos || 0),
@@ -500,7 +512,9 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-dvh pb-14 text-stone-800 antialiased">
-    <Navbar :character="character" />
+    <Navbar :character="character" @open-profile="showingProfile = true" @open-inventory="showingInventory = true" />
+    <ProfileModal v-if="showingProfile" :character="character" @close="showingProfile = false" @character-updated="profileCharacterUpdated" />
+    <InventoryModal v-if="showingInventory" @close="showingInventory = false" @character-updated="handleCharacterUpdated" />
 
     <main class="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 lg:py-8">
       <CharacterHeader
@@ -665,6 +679,7 @@ onUnmounted(() => {
       >
         <p class="m-0 text-sm font-bold text-red-800">Login penalty</p>
         <p class="m-0 mt-1 text-lg font-bold text-red-700">{{ penaltyToast.hpDelta }} HP</p>
+        <p v-if="penaltyToast.knockedOut" class="mt-2 text-sm text-stone-700">Knocked out · Lost {{ penaltyToast.coinLost }} coin. HP restored to {{ penaltyToast.currentHp }}. You can continue.</p>
         <div class="mt-1 grid gap-0.5 text-xs font-semibold text-stone-600">
           <span v-if="penaltyToast.missedHabits > 0">
             {{ penaltyToast.missedHabits }} habit{{ penaltyToast.missedHabits === 1 ? '' : 's' }} missed

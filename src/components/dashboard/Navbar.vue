@@ -19,6 +19,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const emit = defineEmits(['open-profile', 'open-inventory'])
 const router = useRouter()
 const isMenuOpen = ref(false)
 
@@ -96,6 +97,7 @@ const logout = async () => {
           <button
             type="button"
             class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200/70 hover:text-stone-950 active:translate-y-px"
+            @click="emit('open-inventory')"
           >
             <Briefcase class="size-4 text-stone-400" />
             Inventory
@@ -124,12 +126,13 @@ const logout = async () => {
           <span class="absolute right-1.5 top-1.5 size-2 rounded-full bg-red-500 ring-2 ring-[#f8f6f1]"></span>
         </button>
 
-        <div class="hidden items-center gap-2 sm:flex">
-          <div class="grid size-9 place-items-center rounded-md bg-stone-900 text-sm font-semibold text-white">
-            {{ initials }}
+        <button type="button" aria-label="Open profile" class="flex items-center gap-2" @click="emit('open-profile')">
+          <div class="grid size-9 place-items-center overflow-hidden rounded-md bg-stone-900 text-sm font-semibold text-white">
+            <img v-if="auth.user?.avatarUrl" :src="auth.user.avatarUrl" alt="" class="size-full object-cover" />
+            <span v-else>{{ initials }}</span>
           </div>
           <span class="text-sm font-semibold text-stone-800">{{ displayName }}</span>
-        </div>
+        </button>
 
         <button
           type="button"
@@ -158,6 +161,7 @@ const logout = async () => {
         <LayoutDashboard class="size-4" />
         Dashboard
       </RouterLink>
+      <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600" @click="emit('open-inventory'); isMenuOpen = false"><Briefcase class="size-4" />Inventory</button>
       <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-200/70" @click="logout">
         <LogOut class="size-4" />
         Sign out
