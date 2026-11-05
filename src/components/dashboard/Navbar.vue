@@ -79,13 +79,13 @@ const logout = async () => {
             Achievements
           </button>
 
-          <button
-            type="button"
-            class="inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-stone-600 transition hover:bg-stone-200/70 hover:text-stone-950 active:translate-y-px"
+          <RouterLink
+            to="/party"
+            :class="['inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition active:translate-y-px', route.name === 'party' ? 'bg-teal-900 text-white hover:bg-teal-800' : 'text-stone-600 hover:bg-stone-200/70 hover:text-stone-950']"
           >
-            <Users class="size-4 text-stone-400" />
+            <Users :class="['size-4', route.name === 'party' ? 'text-white' : 'text-stone-400']" />
             Party
-          </button>
+          </RouterLink>
 
           <RouterLink
             to="/shop"
@@ -162,6 +162,7 @@ const logout = async () => {
         <LayoutDashboard class="size-4" />
         Dashboard
       </RouterLink>
+      <RouterLink to="/party" :class="['mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', route.name === 'party' ? 'bg-teal-900 text-white' : 'text-stone-600']" @click="isMenuOpen = false"><Users class="size-4" />Party</RouterLink>
       <RouterLink to="/shop" :class="['mt-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold', route.name === 'shop' ? 'bg-teal-900 text-white' : 'text-stone-600']" @click="isMenuOpen = false"><ShoppingBag class="size-4" />Shop</RouterLink>
       <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600" @click="emit('open-inventory'); isMenuOpen = false"><Briefcase class="size-4" />Inventory</button>
       <button type="button" class="mt-2 flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-200/70" @click="logout">
