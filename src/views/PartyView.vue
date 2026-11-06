@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
-  ArrowLeft, Check, Clipboard, Crown, DoorOpen, LoaderCircle,
-  LogIn, Pencil, RefreshCw, ShieldCheck, Trash2, UserMinus, Users,
+  ArrowLeft, Bug, Check, Clipboard, Crown, DoorOpen, Flame, LoaderCircle,
+  Coins, Gem, Lock, LogIn, Pencil, RefreshCw, ShieldCheck, Snowflake, Sparkles, Swords, Trash2,
+  Trees, UserMinus, Users,
 } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 import Navbar from '@/components/dashboard/Navbar.vue'
@@ -14,6 +15,7 @@ import {
   leaveParty, refreshPartyInviteCode, transferPartyLeadership, updateParty,
 } from '@/api/partyApi'
 import { useAuthStore } from '@/stores/auth'
+import { getActiveBossBattle, getPartyBosses, startBossBattle } from '@/api/bossApi'
 
 const auth = useAuthStore()
 const character = ref(null)
@@ -29,8 +31,28 @@ const partyName = ref('')
 const copied = ref(false)
 const showingProfile = ref(false)
 const showingInventory = ref(false)
+const bosses = ref([])
+const activeBattle = ref(null)
+const bossLoading = ref(false)
+const startingBossId = ref(null)
+let bossRefreshTimer = null
 
 const currentUserId = computed(() => auth.user?.id)
+
+const rewardIcon = (type) => ({ EXP: Sparkles, COIN: Coins, GEM: Gem })[type] || Sparkles
+const rewardLabel = (type) => ({ EXP: 'EXP', COIN: 'coin', GEM: 'gem' })[type] || type
+
+const loadBossData = async (silent = false) => {
+  if (!party.value) return
+  if (!silent) bossLoading.value = true
+  try {
+    const [catalogResponse, battleResponse] = await Promise.all([getPartyBosses(), getActiveBossBattle()])
+    bosses.value = catalogResponse.data || []
+    activeBattle.value = battleResponse.status === 204 ? null : battleResponse.data
+  } catch (requestError) {
+    error.value = requestError.response?.data?.message || 'Could not load bosses.'
+  } finally { if (!silent) bossLoading.value = false }
+}
 
 const load = async () => {
   loading.value = true
@@ -40,6 +62,7 @@ const load = async () => {
     party.value = partyResponse.status === 204 ? null : partyResponse.data
     character.value = characterResponse.data
     partyName.value = party.value?.name || ''
+    if (party.value) await loadBossData()
   } catch (requestError) {
     error.value = requestError.response?.data?.message || 'Could not load party information.'
   } finally { loading.value = false }
@@ -65,12 +88,18 @@ const run = async (name, request, successMessage) => {
 
 const submitCreate = async () => {
   if (!createName.value.trim()) return
-  if (await run('create', () => createParty(createName.value.trim()), 'Party created.')) createName.value = ''
+  if (await run('create', () => createParty(createName.value.trim()), 'Party created.')) {
+    createName.value = ''
+    await loadBossData()
+  }
 }
 
 const submitJoin = async () => {
   if (!inviteCode.value.trim()) return
-  if (await run('join', () => joinParty(inviteCode.value.trim()), 'Joined party.')) inviteCode.value = ''
+  if (await run('join', () => joinParty(inviteCode.value.trim()), 'Joined party.')) {
+    inviteCode.value = ''
+    await loadBossData()
+  }
 }
 
 const saveName = async () => {
@@ -106,9 +135,46 @@ const disband = async () => {
   if (await run('disband', disbandParty, 'Party disbanded.')) party.value = null
 }
 
+const startBoss = async (boss) => {
+  if (!window.confirm(`Start the battle against ${boss.name}?`)) return
+  startingBossId.value = boss.id
+  error.value = ''
+  message.value = ''
+  try {
+    activeBattle.value = (await startBossBattle(boss.id)).data
+    message.value = `Battle against ${boss.name} started.`
+    await loadBossData()
+  } catch (requestError) {
+    error.value = requestError.response?.data?.message || 'Could not start boss battle.'
+  } finally { startingBossId.value = null }
+}
+
+const bossIcon = (boss) => ({
+  SLIME_KING: Crown,
+  FOREST_GOLEM: Trees,
+  ABYSSAL_SPIDER: Bug,
+  FROST_WYRM: Snowflake,
+  ANCIENT_DRAGON: Flame,
+}[boss.code] || Swords)
+
+const difficultyClass = (difficulty) => ({
+  EASY: 'bg-emerald-50 text-emerald-700', NORMAL: 'bg-blue-50 text-blue-700',
+  HARD: 'bg-amber-50 text-amber-700', EXTREME: 'bg-red-50 text-red-700',
+  LEGENDARY: 'bg-violet-50 text-violet-700',
+}[difficulty] || 'bg-stone-100 text-stone-600')
+
 const handleCharacterUpdated = (updated) => { character.value = { ...character.value, ...updated } }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  bossRefreshTimer = window.setInterval(() => {
+    if (party.value) loadBossData(true)
+  }, 15000)
+})
+
+onUnmounted(() => {
+  if (bossRefreshTimer) window.clearInterval(bossRefreshTimer)
+})
 </script>
 
 <template>
@@ -190,6 +256,45 @@ onMounted(load)
             <button v-else type="button" :disabled="!!action" class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-stone-300 px-3 py-2 text-xs font-bold text-stone-700 hover:bg-stone-100 disabled:opacity-50" @click="leave"><DoorOpen class="size-4" />Leave party</button>
           </section>
         </aside>
+
+        <section class="rounded-lg border border-stone-200 bg-[#fbfaf7] p-5 shadow-[0_8px_24px_rgba(41,37,36,0.04)] lg:col-span-2">
+          <div class="flex flex-wrap items-end justify-between gap-3 border-b border-stone-200 pb-4">
+            <div><p class="m-0 text-xs font-bold uppercase tracking-wide text-teal-700">Boss progression</p><h2 class="m-0 mt-1 text-xl font-semibold text-stone-950">Party encounters</h2><p class="m-0 mt-1 text-sm text-stone-500">Defeat each boss to unlock the next encounter.</p></div>
+            <span v-if="activeBattle" class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700"><Swords class="size-3.5" />Battle active</span>
+          </div>
+
+          <div v-if="bossLoading" class="flex items-center justify-center gap-2 py-12 text-sm font-semibold text-stone-500"><LoaderCircle class="size-5 animate-spin" />Loading encounters…</div>
+          <div v-else class="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <article v-for="boss in bosses" :key="boss.id" :class="['relative flex min-h-64 flex-col overflow-hidden rounded-lg border p-4', boss.availability === 'ACTIVE' ? 'border-red-300 bg-red-50/40' : boss.availability === 'AVAILABLE' ? 'border-teal-300 bg-white' : 'border-stone-200 bg-stone-50']">
+              <div class="flex items-start justify-between gap-2">
+                <div :class="['grid size-10 place-items-center rounded-md', boss.availability === 'LOCKED' ? 'bg-stone-200 text-stone-400' : 'bg-stone-900 text-white']"><component :is="boss.availability === 'LOCKED' ? Lock : bossIcon(boss)" class="size-5" /></div>
+                <span :class="['rounded px-1.5 py-0.5 text-[10px] font-bold uppercase', difficultyClass(boss.difficulty)]">{{ boss.difficulty }}</span>
+              </div>
+              <p class="m-0 mt-3 text-[10px] font-bold uppercase tracking-[0.12em] text-stone-400">Encounter {{ boss.sequenceOrder }}</p>
+              <h3 class="m-0 mt-1 text-base font-semibold text-stone-950">{{ boss.name }}</h3>
+              <p class="mt-2 text-xs leading-5 text-stone-500">{{ boss.description }}</p>
+              <div class="mt-3 flex flex-wrap gap-1.5" aria-label="Boss rewards">
+                <span v-for="reward in boss.rewards" :key="reward.type" class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">
+                  <component :is="rewardIcon(reward.type)" class="size-3" />
+                  {{ reward.amount.toLocaleString() }} {{ rewardLabel(reward.type) }}
+                </span>
+              </div>
+              <div class="mt-auto pt-4">
+                <div class="flex items-center justify-between text-xs"><span class="font-semibold text-stone-500">HP</span><span class="font-bold text-stone-800">{{ boss.baseHp.toLocaleString() }}</span></div>
+                <div v-if="boss.availability === 'DEFEATED'" class="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-center text-xs font-bold text-emerald-700">Defeated</div>
+                <div v-else-if="boss.availability === 'ACTIVE'" class="mt-3 rounded-md bg-red-100 px-3 py-2 text-center text-xs font-bold text-red-700">In battle</div>
+                <button v-else-if="boss.availability === 'AVAILABLE' && party.currentUserLeader" type="button" :disabled="!!startingBossId" class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-teal-900 px-3 py-2 text-xs font-bold text-white hover:bg-teal-800 disabled:opacity-50" @click="startBoss(boss)"><LoaderCircle v-if="startingBossId === boss.id" class="size-3.5 animate-spin" /><Swords v-else class="size-3.5" />Start battle</button>
+                <p v-else class="m-0 mt-3 min-h-8 text-center text-[11px] font-semibold leading-4 text-stone-400">{{ boss.availability === 'AVAILABLE' ? 'Leader can start this battle' : boss.unavailableReason }}</p>
+              </div>
+            </article>
+          </div>
+
+          <div v-if="activeBattle" class="mt-5 rounded-lg border border-red-200 bg-white p-4">
+            <div class="flex items-center justify-between gap-3"><div><p class="m-0 text-xs font-bold uppercase tracking-wide text-red-600">Current battle</p><h3 class="m-0 mt-1 text-lg font-semibold text-stone-950">{{ activeBattle.bossName }}</h3></div><span class="text-sm font-bold text-stone-700">{{ activeBattle.currentHp.toLocaleString() }} / {{ activeBattle.maxHp.toLocaleString() }} HP</span></div>
+            <div class="mt-3 h-2.5 overflow-hidden rounded-full bg-stone-200"><div class="h-full rounded-full bg-red-500" :style="{ width: `${Math.max(0, Math.min(100, activeBattle.currentHp / activeBattle.maxHp * 100))}%` }"></div></div>
+            <p class="m-0 mt-2 text-xs text-stone-400">Started by {{ activeBattle.startedByUsername }} · Damage from habit and todo completion will be added in the next phase.</p>
+          </div>
+        </section>
       </div>
     </main>
   </div>
